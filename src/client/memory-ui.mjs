@@ -11,12 +11,15 @@ const button = (label, action) => {
   value.addEventListener('click', () => void action());
   return value;
 };
-export function createMemoryUI({ container, api, onResume, getContext }) {
+export function createMemoryUI({ container, api, onResume, onOpenCitation, getContext }) {
   const status = el('p', '', 'field-hint');
   status.setAttribute('role', 'status');
   const content = el('div');
   const currentThreads = new Map();
-  const key = (scope) => `${scope.courseId || ''}:${scope.assignmentId || ''}`;
+  const key = (scope) =>
+    scope.documentId
+      ? `reading:${scope.documentId}`
+      : `course:${scope.courseId || ''}:${scope.assignmentId || ''}`;
   function activeThread(scope) {
     return currentThreads.get(key(scope));
   }
@@ -36,10 +39,12 @@ export function createMemoryUI({ container, api, onResume, getContext }) {
       const data = await api(`/api/memory/thread?id=${encodeURIComponent(id)}&offset=${offset}`);
       content.replaceChildren(el('h2', data.thread.title));
       content.append(
-        button('Resume this conversation', async () => {
-          setThread(data.thread, data.thread.id);
-          await onResume(data.thread);
-        }),
+        button('Resume this conversation', () =>
+          run(async () => {
+            await onResume(data.thread);
+            setThread(data.thread, data.thread.id);
+          }),
+        ),
       );
       const remove = button('Delete conversation', async () => {
         if (!window.confirm('Delete this saved conversation? Export it first if you want a copy.'))
@@ -57,6 +62,17 @@ export function createMemoryUI({ container, api, onResume, getContext }) {
         renderChatText(message, turn.content);
         article.append(el('h3', turn.role === 'user' ? 'You' : 'Roger'), message);
         for (const citation of turn.citations || []) {
+          if (citation.documentId && citation.revision && citation.page && onOpenCitation) {
+            const label = `${citation.title || 'Reading'} · ${citation.location || 'page'} ${citation.page}`;
+            const detail = el('details');
+            detail.append(
+              el('summary', label),
+              el('blockquote', citation.quote),
+              button('Open cited source', () => run(() => onOpenCitation(citation))),
+            );
+            article.append(detail);
+            continue;
+          }
           if (!citation.url && !citation.sourceUrl) continue;
           const link = el(
             'a',
@@ -178,7 +194,7 @@ export function createMemoryUI({ container, api, onResume, getContext }) {
           button(thread.title, () => openThread(thread.id)),
           el(
             'small',
-            `${thread.courseId ? 'Course ' + thread.courseId : 'General'} · ${new Date(thread.updatedAt).toLocaleString()}`,
+            `${thread.documentId ? 'Reading' : thread.courseId ? 'Course ' + thread.courseId : 'General'} · ${new Date(thread.updatedAt).toLocaleString()}`,
           ),
         );
         content.append(row);

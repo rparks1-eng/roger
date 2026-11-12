@@ -2,6 +2,9 @@ import { mountAssignmentStudy } from '/client/study-ui.mjs';
 import { openSyllabusReading } from '/client/syllabus-ui.mjs';
 
 const CORPUS_CHARACTERS = 8_000_000;
+const ATTACHMENT_CHARACTERS = 24_000;
+const COURSE_ATTACHMENT_CHARACTERS = 120_000;
+const ATTACHMENT_LIMIT = 12;
 const GROUPS = ['Past assignments', 'Documents', 'Pages', 'Links', 'Videos', 'Other materials'];
 
 function element(tag, text, className) {
@@ -64,6 +67,58 @@ function selectable(entry, group) {
   );
 }
 
+function attachmentLabel(entry, group) {
+  if (entry.locked) return '';
+  if (group === 'Videos') return 'transcript';
+  if (group === 'Links') return 'reading text';
+  return '';
+}
+
+function transcriptPages(text) {
+  const cue = /^\[?((?:\d{1,3}:)?\d{1,3}:[0-5]\d(?:[.,]\d{3})?)\]?(?:\s+|$)/;
+  if (/^WEBVTT(?:\s|$)/.test(text))
+    return text
+      .split(/\n[ \t]*\n+/)
+      .slice(1)
+      .flatMap((block) => {
+        if (/^(?:NOTE|STYLE|REGION)(?:\s|$)/.test(block)) return [];
+        const lines = block.split('\n');
+        for (const [index, line] of lines.slice(0, 2).entries()) {
+          const marker = cue.exec(line.trim());
+          if (!marker || !line.trim().slice(marker[0].length).startsWith('-->')) continue;
+          const passage = lines
+            .slice(index + 1)
+            .join('\n')
+            .trim();
+          return passage ? [{ page: null, timestamp: marker[1], text: passage }] : [];
+        }
+        return [];
+      });
+  const pages = [];
+  let timestamp = '';
+  let lines = [];
+  function save() {
+    const passage = lines.join('\n').trim();
+    if (passage) pages.push({ page: null, timestamp, text: passage });
+  }
+  const transcript = text.split('\n');
+  for (const [index, line] of transcript.entries()) {
+    const value = line.trim();
+    if (/^\d+$/.test(value) && cue.test(transcript[index + 1]?.trim() || '')) continue;
+    const marker = cue.exec(value);
+    if (!marker) {
+      lines.push(line);
+      continue;
+    }
+    save();
+    timestamp = marker[1];
+    const rest = value.slice(marker[0].length);
+    lines = rest.startsWith('-->') ? [] : [rest];
+  }
+  save();
+  return pages;
+}
+
 export function mountCourseStudy({
   content,
   course,
@@ -78,9 +133,16 @@ export function mountCourseStudy({
 }) {
   const courseId = course.course.id;
   const groups = catalogue(course);
+  const attachments = (draft.externalText ??= new Map());
   const candidates = new Map();
-  for (const [group, entries] of groups)
-    for (const entry of entries) if (selectable(entry, group)) candidates.set(entry.key, entry);
+  for (const [group, entries] of groups) {
+    for (const entry of entries) {
+      if (selectable(entry, group)) candidates.set(entry.key, entry);
+      const attachment = attachments.get(entry.key);
+      if (attachment && attachmentLabel(entry, group))
+        candidates.set(entry.key, { ...entry, attachment });
+    }
+  }
   draft.selected ??= [...candidates.keys()];
   const selected = new Set(draft.selected.filter((key) => candidates.has(key)));
   const panel = element('section', undefined, 'course-study-library');
@@ -95,7 +157,7 @@ export function mountCourseStudy({
     ),
     element(
       'p',
-      'Includes the assignments and module materials listed below. External links and videos need notes or a transcript. Oversized or unreadable documents are reported.',
+      'Attach reading text or a transcript directly to a link or video to use it in practice. Roger keeps the Canvas reference and uses only the text you supply.',
       'muted',
     ),
     message,
@@ -105,6 +167,120 @@ export function mountCourseStudy({
     draft.selected = [...selected];
     message.textContent = `${selected.size} of ${candidates.size} available course sources selected · syllabus and your notes are included separately`;
     for (const control of controls) control.checked = selected.has(control.dataset.key);
+  }
+  function clearPractice() {
+    invalidate();
+    study.replaceChildren();
+    draft.decks?.clear();
+    draft.lastEngine = null;
+    if (draft.examPlan) {
+      draft.examPlan = null;
+      planResult.replaceChildren();
+      planStatus.textContent = 'Source availability changed. Run the syllabus plan again.';
+    }
+    updateSelection();
+  }
+  function attachEditor(entry, kind, checkbox) {
+    const editor = element('details', undefined, 'course-study-attachment');
+    const title = element('summary');
+    const label = element(
+      'label',
+      `${kind === 'transcript' ? 'Transcript' : 'Reading text'} for ${entry.title}`,
+    );
+    const input = element('textarea');
+    input.rows = 4;
+    input.maxLength = ATTACHMENT_CHARACTERS;
+    input.value = attachments.get(entry.key)?.text || '';
+    input.placeholder =
+      kind === 'transcript'
+        ? 'Paste text with timestamps, if available'
+        : 'Paste the reading text here';
+    label.append(input);
+    const fileLabel = element('label', 'Load local text file');
+    const file = element('input');
+    file.type = 'file';
+    file.accept = kind === 'transcript' ? '.txt,.md,.vtt,.srt' : '.txt,.md';
+    fileLabel.append(file);
+    const save = element('button', 'Use attached text', 'button button-secondary');
+    const remove = element('button', 'Remove attached text', 'button button-quiet');
+    save.type = remove.type = 'button';
+    const feedback = element('p', '', 'muted');
+    feedback.setAttribute('role', 'status');
+    function showAttachment() {
+      const attached = attachments.has(entry.key);
+      title.textContent = attached ? `Edit attached ${kind}` : `Attach ${kind}`;
+      checkbox.hidden = !attached;
+      remove.hidden = !attached;
+      feedback.textContent = attached
+        ? 'Attached for this study session.'
+        : 'Unavailable for practice until text is attached.';
+    }
+    function clean(value) {
+      const text = value.replace(/\r\n?/g, '\n').trim();
+      if (!text || text.includes('\0')) throw new Error('Choose readable plain text.');
+      if (text.length > ATTACHMENT_CHARACTERS)
+        throw new Error('Use up to 24,000 characters from this source.');
+      return text;
+    }
+    file.addEventListener('change', async () => {
+      const selectedFile = file.files[0];
+      if (!selectedFile) return;
+      const name = selectedFile.name.toLowerCase();
+      if (
+        selectedFile.size > ATTACHMENT_CHARACTERS * 4 ||
+        !(kind === 'transcript' ? /\.(?:txt|md|srt|vtt)$/ : /\.(?:txt|md)$/).test(name)
+      ) {
+        feedback.textContent = 'Choose a supported text file no larger than 96 KB.';
+        file.value = '';
+        return;
+      }
+      file.disabled = input.disabled = save.disabled = remove.disabled = true;
+      try {
+        input.value = clean(
+          new TextDecoder('utf-8', { fatal: true }).decode(await selectedFile.arrayBuffer()),
+        );
+        feedback.textContent = 'Text loaded. Choose Use attached text to include it.';
+      } catch (error) {
+        feedback.textContent =
+          error instanceof TypeError ? 'Choose a UTF-8 text file.' : error.message;
+      } finally {
+        file.value = '';
+        file.disabled = input.disabled = save.disabled = remove.disabled = false;
+      }
+    });
+    save.addEventListener('click', () => {
+      try {
+        const text = clean(input.value);
+        const old = attachments.get(entry.key);
+        const total = [...attachments.values()].reduce((sum, item) => sum + item.text.length, 0);
+        if (
+          (!old && attachments.size >= ATTACHMENT_LIMIT) ||
+          total - (old?.text.length || 0) + text.length > COURSE_ATTACHMENT_CHARACTERS
+        )
+          throw new Error('Remove an attachment before adding more text to this study session.');
+        if (kind === 'transcript' && !transcriptPages(text).length)
+          throw new Error('The transcript needs readable text as well as any timestamps.');
+        const attachment = { kind, text };
+        attachments.set(entry.key, attachment);
+        candidates.set(entry.key, { ...entry, attachment });
+        selected.add(entry.key);
+        showAttachment();
+        clearPractice();
+      } catch (error) {
+        feedback.textContent = error.message;
+      }
+    });
+    remove.addEventListener('click', () => {
+      attachments.delete(entry.key);
+      candidates.delete(entry.key);
+      selected.delete(entry.key);
+      input.value = '';
+      showAttachment();
+      clearPractice();
+    });
+    editor.append(title, label, fileLabel, save, remove, feedback);
+    showAttachment();
+    return editor;
   }
   const selectionActions = element('div', undefined, 'study-actions');
   for (const [label, include] of [
@@ -245,7 +421,7 @@ export function mountCourseStudy({
         list,
         element(
           'p',
-          'Add the files or paste your notes in Exam practice below. External videos need a transcript; an inaccessible file is not treated as read.',
+          'Attach reading text or a transcript to its link or video in the list below. Add other files or notes in Exam practice.',
         ),
       );
       planResult.append(missing);
@@ -315,8 +491,10 @@ export function mountCourseStudy({
     for (const entry of entries) {
       const row = element('li', undefined, 'course-study-item');
       const label = element('label');
-      if (candidates.has(entry.key)) {
-        const checkbox = element('input');
+      const attach = attachmentLabel(entry, group);
+      let checkbox;
+      if (candidates.has(entry.key) || attach) {
+        checkbox = element('input');
         checkbox.type = 'checkbox';
         checkbox.dataset.key = entry.key;
         checkbox.checked = selected.has(entry.key);
@@ -335,13 +513,12 @@ export function mountCourseStudy({
       label.append(element('span', entry.title));
       row.append(label, external('Open in Canvas', entry.url));
       if (entry.module) row.append(element('small', entry.module, 'muted'));
-      if (!candidates.has(entry.key))
+      if (attach) row.append(attachEditor(entry, attach, checkbox));
+      else if (!candidates.has(entry.key))
         row.append(
           element(
             'small',
-            entry.locked
-              ? 'Locked in Canvas'
-              : 'Open in Canvas · add relevant notes or a transcript to study it',
+            entry.locked ? 'Locked in Canvas' : 'Open in Canvas · add relevant notes to study it',
             'muted',
           ),
         );
@@ -514,7 +691,17 @@ export async function readMaterials(
   for (const item of sources.filter((entry) => !entry.assignmentId)) {
     signal.throwIfAborted();
     try {
-      if (item.fileId) {
+      if (item.attachment) {
+        const { kind, text } = item.attachment;
+        append({
+          kind: 'material',
+          title: item.title,
+          url: item.url,
+          foundIn: `Your attached ${kind}`,
+          provenance: `Your attached ${kind}`,
+          ...(kind === 'transcript' ? { pages: transcriptPages(text) } : { text }),
+        });
+      } else if (item.fileId) {
         const source = { kind: 'file', fileId: item.fileId, title: item.title, url: item.url };
         const reading = await loader.readMaterial(source, courseId, signal);
         append({

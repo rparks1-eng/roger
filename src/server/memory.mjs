@@ -13,6 +13,8 @@ export const MEMORY_FILE = path.join(
   'memory.sqlite',
 );
 const ID = /^[a-f0-9-]{36}$/;
+const READING_ID = /^[a-f0-9]{64}$/;
+const READING_PREFIX = 'reading:';
 // Best-effort recognition of common credential forms; never a promise that all
 // arbitrary secrets can be identified from their text alone.
 const SECRET =
@@ -38,10 +40,19 @@ function context(input = {}) {
     throw new HttpError(400, 'A memory context object is required.');
   const courseId = text(input.courseId, 'Course identifier', 80, true);
   const assignmentId = text(input.assignmentId, 'Assignment identifier', 80, true);
+  const documentId = text(input.documentId, 'Reading identifier', 64, true);
+  if (
+    courseId.startsWith(READING_PREFIX) ||
+    (documentId && (!READING_ID.test(documentId) || courseId || assignmentId))
+  )
+    throw new HttpError(400, 'Choose one valid reading or course for this conversation.');
   if (assignmentId && !courseId)
     throw new HttpError(400, 'Assignment memory needs its course identifier.');
-  return { courseId, assignmentId };
+  return { courseId, assignmentId, documentId };
 }
+// The existing scope index isolates readings without migrating the local database.
+const scopeCourse = (scope) =>
+  scope.documentId ? READING_PREFIX + scope.documentId : scope.courseId;
 function identifier(value) {
   if (typeof value !== 'string' || !ID.test(value))
     throw new HttpError(400, 'Invalid memory identifier.');
@@ -58,6 +69,7 @@ function citations(input = []) {
       id: 120,
       ref: 120,
       documentId: 120,
+      revision: 120,
       title: 300,
       url: 2048,
       sourceUrl: 2048,
@@ -95,6 +107,11 @@ function citations(input = []) {
         throw new HttpError(400, 'Invalid citation page.');
       result.page = item.page;
     }
+    if (item.location !== undefined) {
+      if (!['page', 'slide', 'section'].includes(item.location))
+        throw new HttpError(400, 'Invalid citation location.');
+      result.location = item.location;
+    }
     return result;
   });
   if (Buffer.byteLength(JSON.stringify(values)) > 32_768)
@@ -102,11 +119,15 @@ function citations(input = []) {
   return values;
 }
 function publicThread(row) {
+  const documentId = row.course_id.startsWith(READING_PREFIX)
+    ? row.course_id.slice(READING_PREFIX.length)
+    : '';
   return {
     id: row.id,
     title: row.title,
-    courseId: row.course_id,
+    courseId: documentId ? '' : row.course_id,
     assignmentId: row.assignment_id,
+    ...(documentId ? { documentId } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     turnCount: row.turn_count ?? undefined,
@@ -268,8 +289,11 @@ export function createMemoryStore({
     if (!row) throw new HttpError(404, 'This conversation was not found.');
     if (!(allowAll && input.all === true)) {
       const scope = context(input);
-      if (scope.courseId !== row.course_id || scope.assignmentId !== row.assignment_id)
-        throw new HttpError(403, 'This conversation belongs to a different course or assignment.');
+      if (scopeCourse(scope) !== row.course_id || scope.assignmentId !== row.assignment_id)
+        throw new HttpError(
+          403,
+          'This conversation belongs to a different course, assignment or reading.',
+        );
     }
     return row;
   }
@@ -298,7 +322,7 @@ export function createMemoryStore({
     if (!Number.isSafeInteger(offset) || offset < 0)
       throw new HttpError(400, 'Invalid conversation offset.');
     const where = input.all === true ? '' : 'WHERE course_id=? AND assignment_id=?';
-    const parameters = input.all === true ? [] : [scope.courseId, scope.assignmentId];
+    const parameters = input.all === true ? [] : [scopeCourse(scope), scope.assignmentId];
     const current = database();
     const rows = current
       .prepare(
@@ -343,36 +367,56 @@ export function createMemoryStore({
       paused: paused(),
     };
   }
-  function appendTurn(input = {}) {
+  function saveTurns(input, turns) {
     const scope = context(input);
-    const content = text(input.content, 'Conversation turn', 65_536);
-    noSecrets(content);
-    if (!['user', 'assistant'].includes(input.role))
-      throw new HttpError(400, 'Memory stores user or assistant conversation turns only.');
-    const sources = citations(input.citations);
-    const serialized = JSON.stringify(sources);
+    const records = turns.map((turn) => {
+      const content = text(turn.content, 'Conversation turn', 65_536);
+      noSecrets(content);
+      if (!['user', 'assistant'].includes(turn.role))
+        throw new HttpError(400, 'Memory stores user or assistant conversation turns only.');
+      return {
+        id: randomUUID(),
+        role: turn.role,
+        content,
+        serialized: JSON.stringify(citations(turn.citations)),
+      };
+    });
     const title = text(
-      input.title || content.replace(/\s+/g, ' ').slice(0, 100),
+      input.title || records[0].content.replace(/\s+/g, ' ').slice(0, 100),
       'Conversation title',
       160,
     );
     noSecrets(title);
-    writable(Buffer.byteLength(content + serialized + title));
+    writable(
+      Buffer.byteLength(title) +
+        records.reduce(
+          (total, turn) => total + Buffer.byteLength(turn.content + turn.serialized),
+          0,
+        ),
+    );
     const existing = input.threadId ? thread(input) : null;
     const threadId = existing?.id ?? randomUUID();
-    const turnId = randomUUID();
     const timestamp = now();
     transaction((current) => {
       if (!existing)
         current
           .prepare('INSERT INTO threads VALUES(?,?,?,?,?,?)')
-          .run(threadId, title, scope.courseId, scope.assignmentId, timestamp, timestamp);
-      current
-        .prepare('INSERT INTO turns VALUES(?,?,?,?,?,?)')
-        .run(turnId, threadId, input.role, content, serialized, timestamp);
+          .run(threadId, title, scopeCourse(scope), scope.assignmentId, timestamp, timestamp);
+      const insert = current.prepare('INSERT INTO turns VALUES(?,?,?,?,?,?)');
+      for (const turn of records)
+        insert.run(turn.id, threadId, turn.role, turn.content, turn.serialized, timestamp);
       current.prepare('UPDATE threads SET updated_at=? WHERE id=?').run(timestamp, threadId);
     });
-    return { threadId, turnId, saved: true };
+    return { threadId, turnId: records[0].id, saved: true };
+  }
+  function appendTurn(input = {}) {
+    return saveTurns(input, [input]);
+  }
+  function recordExchange(input = {}) {
+    return saveTurns(input, [
+      { role: 'user', content: input.message },
+      { role: 'assistant', content: input.reply, citations: input.citations },
+    ]);
   }
   function listPins(input = {}) {
     const scope = context(input);
@@ -487,7 +531,7 @@ export function createMemoryStore({
       .prepare(
         `SELECT t.*,h.title,h.course_id,h.assignment_id FROM turns t JOIN threads h ON h.id=t.thread_id WHERE h.course_id=? AND h.assignment_id=? ${matchSql} ORDER BY t.rowid DESC LIMIT 16`,
       )
-      .all(scope.courseId, scope.assignmentId, ...parameters);
+      .all(scopeCourse(scope), scope.assignmentId, ...parameters);
     for (const row of rows) {
       const start = tokens.length
         ? Math.max(
@@ -542,6 +586,7 @@ export function createMemoryStore({
     listThreads,
     readThread,
     appendTurn,
+    recordExchange,
     retrieve,
     deleteThread,
     export: exportMemory,

@@ -95,11 +95,11 @@ const newsGroups = [
     ],
   ],
 ];
-function newsDirectory() {
+export function renderNewsDirectory(container) {
   const directory = el('section', undefined, 'research-directory');
   directory.id = 'resource-news';
   directory.append(
-    el('h2', 'News & research'),
+    el('h1', 'News & research'),
     el('p', 'Open a publisher or database. For campus subscriptions, start with Horn Library.'),
     link('Horn Library access and databases', 'https://libguides.babson.edu/HornLibrary'),
   );
@@ -113,9 +113,30 @@ function newsDirectory() {
     }
     directory.append(el('h3', category), grid);
   }
-  return directory;
+  container.replaceChildren(directory);
 }
-export function createResourcesUI({ container, api }) {
+function sampleBooks(query) {
+  const match = /\b(?:pride|prejudice|austen|novels?|fiction)\b/i.test(query);
+  const url = 'https://www.gutenberg.org/ebooks/1342';
+  return {
+    sources: [],
+    catalogs: [],
+    results: match
+      ? [
+          {
+            title: 'Pride and Prejudice',
+            authors: ['Jane Austen'],
+            year: '1813',
+            source: 'Project Gutenberg',
+            access: 'Public domain',
+            sourceUrl: url,
+            downloads: [{ format: 'EPUB', url }],
+          },
+        ]
+      : [],
+  };
+}
+export function createResourcesUI({ container, api, isRecording }) {
   let controller,
     generation = 0;
   const form = el('form', undefined, 'resources-form');
@@ -139,27 +160,6 @@ export function createResourcesUI({ container, api }) {
   const catalogs = el('div', undefined, 'resource-catalogs');
   const bookPanel = el('section');
   bookPanel.id = 'resource-books';
-  const booksButton = el('button', 'Books', 'button button-secondary');
-  const newsButton = el('button', 'News & research', 'button button-secondary');
-  const directory = newsDirectory();
-  const nav = el('nav', undefined, 'resource-section-nav');
-  nav.setAttribute('aria-label', 'Resource sections');
-  nav.append(booksButton, newsButton);
-  for (const [button, panel] of [
-    [booksButton, bookPanel],
-    [newsButton, directory],
-  ]) {
-    button.type = 'button';
-    button.setAttribute('aria-controls', panel.id);
-    button.addEventListener('click', () => selectSection(panel));
-  }
-  function selectSection(panel) {
-    bookPanel.hidden = panel !== bookPanel;
-    directory.hidden = panel !== directory;
-    booksButton.setAttribute('aria-pressed', String(panel === bookPanel));
-    newsButton.setAttribute('aria-pressed', String(panel === directory));
-  }
-  selectSection(bookPanel);
   async function request(query) {
     generation++;
     const ownGeneration = generation;
@@ -170,10 +170,10 @@ export function createResourcesUI({ container, api }) {
     search.disabled = true;
     cancel.hidden = false;
     try {
-      const data = await api('/api/resources/search', {
-        body: { query },
-        signal: controller.signal,
-      });
+      const demo = isRecording();
+      const data = demo
+        ? sampleBooks(query)
+        : await api('/api/resources/search', { body: { query }, signal: controller.signal });
       if (ownGeneration !== generation) return;
       results.replaceChildren();
       catalogs.replaceChildren();
@@ -185,7 +185,9 @@ export function createResourcesUI({ container, api }) {
       status.textContent =
         (count
           ? `${count} free ${count === 1 ? 'book' : 'books'} found${match}.`
-          : `No free full copy found${match}.`) +
+          : demo
+            ? 'Try “Pride and Prejudice” in Demo mode.'
+            : `No free full copy found${match}.`) +
         (missing.length ? ` Search unavailable at ${missing.join(' and ')}.` : '');
       for (const item of data.results) {
         const card = el('article', undefined, 'resource-card');
@@ -215,7 +217,7 @@ export function createResourcesUI({ container, api }) {
         card.append(actions);
         results.append(card);
       }
-      catalogs.append(el('h2', 'Search more collections'));
+      if (data.catalogs.length) catalogs.append(el('h2', 'Search more collections'));
       for (const catalog of data.catalogs) {
         const row = el('p');
         row.append(
@@ -254,7 +256,7 @@ export function createResourcesUI({ container, api }) {
       results,
       catalogs,
     );
-    container.replaceChildren(el('h1', 'Find books'), nav, bookPanel, directory);
+    container.replaceChildren(el('h1', 'Find books'), bookPanel);
   }
   function dispose() {
     generation++;

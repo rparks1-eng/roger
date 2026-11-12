@@ -4,6 +4,7 @@ import { openSyllabusReading } from '/client/syllabus-ui.mjs';
 
 const NOTE_LIMIT = 12_000;
 const FILE_TEXT_LIMIT = 9_000;
+const SOURCE_ONLY = ['multiple-choice', 'true-false', 'discussion', 'worksheet'];
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text) node.textContent = text;
@@ -30,6 +31,136 @@ function canvasLink(url, label) {
     return null;
   }
 }
+function sourceLabel(source) {
+  return [
+    source.label,
+    source.page ? `${source.location || 'page'} ${source.page}` : '',
+    source.timestamp,
+    source.ocr ? 'OCR text' : '',
+    source.provenance,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+function downloadStudyFile(name, type, content) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+function csvText(label, value) {
+  // Prefix source strings so a spreadsheet cannot execute them as formulas.
+  return '"' + (label + (value || '')).replaceAll('"', '""') + '"';
+}
+function renderWorksheet(worksheet, sourcesById, practice, renderCitation) {
+  const { rows } = worksheet;
+  const article = element('article', undefined, 'study-card study-worksheet');
+  const table = element('table');
+  table.append(element('caption', 'Compare percentages from one source'));
+  const head = table.createTHead().insertRow();
+  for (const name of ['Cell', 'Practice (%)', 'Source (%)']) {
+    const header = element('th', name);
+    header.scope = 'col';
+    head.append(header);
+  }
+  const body = table.createTBody();
+  const inputs = [];
+  const excerpts = element('div', undefined, 'study-answer');
+  const values = (practice.values ??= rows.map(({ value }) => String(value)));
+  rows.forEach((row, index) => {
+    const cellName = `B${index + 2}`;
+    const line = body.insertRow();
+    const heading = element('th', cellName);
+    heading.scope = 'row';
+    line.append(heading);
+    const input = element('input');
+    input.type = 'number';
+    input.min = '0';
+    input.max = '100';
+    input.step = '0.01';
+    input.required = true;
+    input.value = values[index];
+    input.setAttribute('aria-label', `Practice percentage in ${cellName}`);
+    line.insertCell().append(input);
+    line.insertCell().textContent = row.value + '%';
+    inputs.push(input);
+    const detail = element('details');
+    detail.append(
+      element('summary', `Source for ${cellName}`),
+      renderCitation(sourcesById.get(row.sourceId)),
+      element('blockquote', row.quote, 'study-excerpt'),
+    );
+    excerpts.append(detail);
+  });
+  const range = `B2:B${rows.length + 1}`;
+  const averageFormula = `=ROUND(AVERAGE(${range}),2)`;
+  const spreadFormula = `=ROUND(MAX(${range})-MIN(${range}),2)`;
+  const feedback = element('p');
+  feedback.setAttribute('role', 'status');
+  const formulas = element('div', undefined, 'study-excerpt');
+  formulas.append(
+    element('p', `Average ${averageFormula}`),
+    element('p', `Range ${spreadFormula}`),
+  );
+  const download = button('Download worksheet CSV', () => {
+    if (inputs.some((input) => !input.validity.valid)) return;
+    const data = ['Cell,Practice (%),Source (%),Source title and location,Canvas URL,Excerpt'];
+    rows.forEach((row, index) => {
+      const source = sourcesById.get(row.sourceId);
+      data.push(
+        [
+          `B${index + 2}`,
+          inputs[index].valueAsNumber,
+          row.value,
+          csvText('Source: ', sourceLabel(source)),
+          csvText('URL: ', canvasLink(source.url, '')?.href),
+          csvText('Quote: ', row.quote),
+        ].join(','),
+      );
+    });
+    data.push('Average,' + csvText('', averageFormula), 'Range,' + csvText('', spreadFormula));
+    downloadStudyFile(
+      'study-percentage-worksheet.csv',
+      'text/csv;charset=utf-8',
+      data.join('\r\n'),
+    );
+  });
+  function recalculate() {
+    download.disabled = inputs.some((input) => !input.validity.valid);
+    if (download.disabled) {
+      feedback.textContent =
+        'Enter a value from 0 to 100 with up to two decimal places in each cell.';
+      return;
+    }
+    const values = inputs.map((input) => Math.round(input.valueAsNumber * 100));
+    const mean =
+      Math.round(values.reduce((total, value) => total + value, 0) / values.length) / 100;
+    const spread = (Math.max(...values) - Math.min(...values)) / 100;
+    feedback.textContent = `Average ${mean}% · range ${spread} percentage points`;
+  }
+  inputs.forEach((input, index) =>
+    input.addEventListener('input', () => {
+      values[index] = input.value;
+      recalculate();
+    }),
+  );
+  article.append(
+    element('h4', 'Percentage worksheet'),
+    element(
+      'p',
+      'Edit the practice values to see how they change the average and range. The original values stay beside them.',
+    ),
+    table,
+    feedback,
+    formulas,
+    excerpts,
+    download,
+  );
+  recalculate();
+  return article;
+}
 function addLimited(pages, budget, append) {
   for (const { page, text } of pages) {
     if (budget <= 0 || !text.trim()) continue;
@@ -50,12 +181,14 @@ export function collectSources(assignment, instructions, syllabus, draft, materi
   };
   add('assignment', assignment.name, instructions, { url: assignment.url });
   for (const item of materials) {
-    for (const { page, text } of item.pages || [{ page: null, text: item.text }])
+    for (const { page, text, timestamp } of item.pages || [{ page: null, text: item.text }])
       add(item.kind, item.title, text, {
         page,
+        timestamp,
         url: item.url,
         reader: item.reader,
         location: item.location,
+        provenance: item.provenance,
         ocr: Boolean(item.ocr?.some((entry) => entry.page === page)),
       });
   }
@@ -75,7 +208,14 @@ export function collectSources(assignment, instructions, syllabus, draft, materi
   return result;
 }
 
-export async function retrieveStudySources(sources, focus, api, signal, progress = () => {}) {
+export async function retrieveStudySources(
+  sources,
+  focus,
+  api,
+  signal,
+  progress = () => {},
+  mode = 'flashcards',
+) {
   const byId = new Map(sources.map((source) => [source.id, source]));
   let candidates = [];
   let batch = [];
@@ -94,7 +234,7 @@ export async function retrieveStudySources(sources, focus, api, signal, progress
     }
     const result = await api('/api/study/passages', {
       signal,
-      body: { mode: 'flashcards', engine: 'quick', focus, sources: [...combined.values()] },
+      body: { mode, engine: 'quick', focus, sources: [...combined.values()] },
     });
     const selected = new Map();
     for (const passage of result.passages) {
@@ -194,6 +334,8 @@ export function mountAssignmentStudy({
     ['practice', 'Practice questions'],
     ['multiple-choice', 'Multiple choice'],
     ['true-false', 'True or false'],
+    ['discussion', 'Discussion prompts'],
+    ['worksheet', 'Spreadsheet exercise'],
   ]) {
     const option = element('option', label);
     option.value = value;
@@ -241,7 +383,7 @@ export function mountAssignmentStudy({
   const controls = () => {
     const busy = loading || readingFile || Boolean(generating);
     quick.disabled = local.disabled = busy;
-    local.hidden = ['multiple-choice', 'true-false'].includes(mode.value);
+    local.hidden = SOURCE_ONLY.includes(mode.value);
     notes.disabled = mode.disabled = Boolean(generating);
     topic.disabled = Boolean(generating);
     file.disabled = readingFile || Boolean(generating) || draft.files.length >= 2;
@@ -334,9 +476,97 @@ export function mountAssignmentStudy({
       controls();
     }
   });
-  function renderDeck(result, sources, restored) {
+  function renderCitation(source) {
+    const citation = element('div', undefined, 'study-citation');
+    const sourceName = sourceLabel(source);
+    citation.append(element('strong', sourceName));
+    if (source.kind === 'assignment' && !courseStudy) {
+      citation.append(
+        button('Go to instructions', () => {
+          const target = container.parentElement?.querySelector('#assignment-instructions');
+          target?.focus();
+          target?.scrollIntoView({ block: 'start' });
+        }),
+      );
+    } else if (source.kind === 'syllabus' && syllabus?.result.file?.type === 'application/pdf') {
+      citation.append(
+        button(`Read page ${source.page}`, () => {
+          void openSyllabusReading(syllabus.source, syllabus.result, importFile, {
+            page: source.page,
+          });
+        }),
+      );
+    } else if (source.reader && source.page) {
+      citation.append(
+        button(`Read ${source.location || 'page'} ${source.page}`, async () => {
+          const request = operation();
+          try {
+            live.textContent = 'Opening the original source…';
+            const reading = await loader.readMaterial(
+              source.reader.source,
+              courseId,
+              request.signal,
+            );
+            if (!request.valid()) return;
+            await openSyllabusReading(source.reader.source, reading, importFile, {
+              page: source.page,
+              signal: request.signal,
+            });
+          } catch (error) {
+            if (request.valid()) live.textContent = error.message;
+          }
+        }),
+      );
+    } else if (source.kind === 'notes') {
+      citation.append(
+        button('Go to note', () => {
+          const details = section.querySelector(`#study-note-source-${source.noteFile}`);
+          if (details) {
+            details.open = true;
+            details.querySelector('summary').focus();
+          } else notes.focus();
+        }),
+      );
+    }
+    const link = canvasLink(source.url, source.provenance ? 'Open Canvas item' : 'Canvas original');
+    if (link) citation.append(link);
+    return citation;
+  }
+  function renderDeck(result, sources, restored, practice) {
     const sourcesById = new Map(sources.map((source) => [source.id, source]));
-    let index = 0;
+    if (mode.value === 'worksheet') {
+      cards.replaceChildren();
+      if (!result.worksheet) {
+        live.textContent =
+          'Choose one short source excerpt with at least two explicit percentages, or paste one in your notes.';
+        return;
+      }
+      cards.append(renderWorksheet(result.worksheet, sourcesById, practice, renderCitation));
+      live.textContent = restored ? 'Reopened this worksheet with your edits.' : 'Worksheet ready.';
+      return;
+    }
+    const discussion = mode.value === 'discussion';
+    const responses = (practice.responses ??= []);
+    let index = discussion ? practice.cardIndex || 0 : 0;
+    const exportDiscussion = () => {
+      const entries = result.cards.map((card, index) => {
+        const source = sourcesById.get(card.sourceId);
+        const url = canvasLink(source.url, '')?.href;
+        return [
+          `${index + 1}. ${card.prompt}`,
+          'Source · ' + sourceLabel(source),
+          ...(url ? [url] : []),
+          card.quote,
+          'Rubric · ' + card.answer,
+          ...(responses[index]?.trim() ? ['Your response · ' + responses[index]] : []),
+        ].join('\n');
+      });
+      downloadStudyFile(
+        'study-discussion-prompts.txt',
+        'text/plain;charset=utf-8',
+        ['Discussion practice', ...entries].join('\n\n'),
+      );
+    };
     function renderCard() {
       const card = result.cards[index];
       const source = sourcesById.get(card.sourceId);
@@ -344,7 +574,11 @@ export function mountAssignmentStudy({
       const header = element('header', undefined, 'study-card-header');
       header.append(
         element('span', `${index + 1} of ${result.cards.length}`, 'canvas-eyebrow'),
-        element('span', card.generated ? 'Local AI question' : 'Source recall', 'muted'),
+        element(
+          'span',
+          discussion ? 'Discussion prompt' : card.generated ? 'Local AI question' : 'Source recall',
+          'muted',
+        ),
       );
       const prompt = element('h4', card.prompt, 'study-prompt');
       prompt.tabIndex = -1;
@@ -370,78 +604,25 @@ export function mountAssignmentStudy({
           options.append(label);
         }
       }
-      const reveal = button('Show answer', () => {
+      const revealLabel = discussion ? 'rubric' : 'answer';
+      const reveal = button(`Show ${revealLabel}`, () => {
         answer.hidden = !answer.hidden;
         feedback.textContent =
           picked === null ? '' : picked === card.answer ? 'Correct.' : 'Check the source below.';
         reveal.setAttribute('aria-expanded', String(!answer.hidden));
-        reveal.textContent = answer.hidden ? 'Show answer' : 'Hide answer';
+        reveal.textContent = (answer.hidden ? 'Show ' : 'Hide ') + revealLabel;
       });
       reveal.setAttribute('aria-expanded', 'false');
       reveal.setAttribute('aria-controls', 'study-answer');
       answer.id = 'study-answer';
-      const citation = element('div', undefined, 'study-citation');
-      const sourceName = `${source.label}${source.page ? ` · ${source.location || 'page'} ${source.page}` : ''}${source.ocr ? ' · OCR text' : ''}`;
-      citation.append(element('strong', sourceName));
-      if (source.kind === 'assignment' && !courseStudy) {
-        citation.append(
-          button('Go to instructions', () => {
-            const target = container.parentElement?.querySelector('#assignment-instructions');
-            target?.focus();
-            target?.scrollIntoView({ block: 'start' });
-          }),
-        );
-      } else if (source.kind === 'syllabus' && syllabus?.result.file?.type === 'application/pdf') {
-        citation.append(
-          button(`Read page ${source.page}`, () => {
-            void openSyllabusReading(syllabus.source, syllabus.result, importFile, {
-              page: source.page,
-            });
-          }),
-        );
-      } else if (source.reader && source.page) {
-        citation.append(
-          button(`Read ${source.location || 'page'} ${source.page}`, async () => {
-            const request = operation();
-            try {
-              live.textContent = 'Opening the original source…';
-              const reading = await loader.readMaterial(
-                source.reader.source,
-                courseId,
-                request.signal,
-              );
-              if (!request.valid()) return;
-              await openSyllabusReading(source.reader.source, reading, importFile, {
-                page: source.page,
-                signal: request.signal,
-              });
-            } catch (error) {
-              if (request.valid()) live.textContent = error.message;
-            }
-          }),
-        );
-      } else if (source.kind === 'notes') {
-        citation.append(
-          button('Go to note', () => {
-            const details = section.querySelector(`#study-note-source-${source.noteFile}`);
-            if (details) {
-              details.open = true;
-              details.querySelector('summary').focus();
-            } else notes.focus();
-          }),
-        );
-      }
-      const link = canvasLink(source.url, 'Canvas original');
-      if (link) citation.append(link);
-      answer.append(
-        feedback,
-        element('p', card.answer, 'study-excerpt'),
-        citation,
-        element('blockquote', card.quote, 'study-excerpt'),
-      );
+      const citation = renderCitation(source);
+      const excerpt = element('blockquote', card.quote, 'study-excerpt');
+      answer.append(feedback, element('p', card.answer, 'study-excerpt'));
+      if (!discussion) answer.append(citation, excerpt);
       const navigation = element('div', undefined, 'study-actions');
       const move = (step) => {
         index += step;
+        if (discussion) practice.cardIndex = index;
         renderCard();
         cards.querySelector('.study-prompt')?.focus();
       };
@@ -451,6 +632,19 @@ export function mountAssignmentStudy({
       next.disabled = index === result.cards.length - 1;
       navigation.append(previous, next);
       article.append(header, prompt);
+      if (discussion) {
+        const reflection = element('div', undefined, 'study-note-area');
+        const label = element('label', 'Your response');
+        const input = element('textarea');
+        input.id = label.htmlFor = 'study-discussion-response';
+        input.maxLength = 4_000;
+        input.rows = 3;
+        input.value = responses[index] || '';
+        input.addEventListener('input', () => (responses[index] = input.value));
+        reflection.append(label, input);
+        article.append(citation, excerpt, reflection);
+        navigation.append(button('Download discussion prompts', exportDiscussion));
+      }
       if (card.options?.length) article.append(options);
       article.append(reveal, answer, navigation);
       cards.replaceChildren(article);
@@ -458,9 +652,11 @@ export function mountAssignmentStudy({
     renderCard();
     live.textContent = restored
       ? 'Reopened this set from memory.'
-      : result.fallback
-        ? 'Local AI did not return usable questions. Source-based practice is ready.'
-        : `${result.cards.length} cards ready · a focused sample from the searched material. Change the exam topic to explore another part of the course.`;
+      : discussion
+        ? `${result.cards.length} discussion prompts ready.`
+        : result.fallback
+          ? 'Local AI did not return usable questions. Source-based practice is ready.'
+          : `${result.cards.length} cards ready · a focused sample from the searched material. Change the exam topic to explore another part of the course.`;
   }
   async function generate(engine, { restore = false } = {}) {
     if (loading || generating || readingFile || !alive()) return;
@@ -482,12 +678,19 @@ export function mountAssignmentStudy({
     try {
       const key = await cacheKey({
         ...body,
-        references: sources.map(({ label, url, page, ocr }) => [label, url, page, ocr]),
+        references: sources.map(({ label, url, page, ocr, timestamp, provenance }) => [
+          label,
+          url,
+          page,
+          ocr,
+          timestamp,
+          provenance,
+        ]),
       });
       if (!request.valid() || !alive()) return;
       const cached = draft.decks.get(body.mode + ':' + engine);
       if (cached?.key === key) {
-        renderDeck(cached.result, cached.sources || sources, true);
+        renderDeck(cached.result, cached.sources || sources, true, cached.practice);
         return;
       }
       if (restore) return;
@@ -500,22 +703,31 @@ export function mountAssignmentStudy({
           if (request.valid())
             live.textContent = `Searching course text · ${done} of ${total} passages checked…`;
         },
+        body.mode === 'worksheet' ? 'worksheet' : 'flashcards',
       );
       if (!request.valid() || !alive()) return;
+      if (body.mode === 'worksheet' && !sources.length) {
+        live.textContent =
+          'Choose one short source excerpt with at least two explicit percentages, or paste one in your notes.';
+        return;
+      }
       body = { ...body, sources: sources.map(({ id, kind, text }) => ({ id, kind, text })) };
       live.textContent =
         engine === 'local'
           ? 'Building questions with the local model…'
-          : 'Building cards from your sources…';
+          : body.mode === 'worksheet'
+            ? 'Building a worksheet from cited percentages…'
+            : 'Building practice from your sources…';
       cards.setAttribute('aria-busy', 'true');
       cards.replaceChildren(skeleton('practice'));
       const result = await api('/api/study/set', { body, signal: request.signal });
       if (!request.valid() || !alive()) return;
+      const practice = {};
       if (!result.fallback) {
-        draft.decks.set(body.mode + ':' + engine, { key, result, sources });
+        draft.decks.set(body.mode + ':' + engine, { key, result, sources, practice });
         draft.lastEngine = engine;
       }
-      renderDeck(result, sources, false);
+      renderDeck(result, sources, false, practice);
     } catch (error) {
       if (alive() && request.valid()) {
         cards.replaceChildren();

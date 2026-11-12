@@ -158,6 +158,160 @@ def item(raw, cid):
     )
 
 
+def community_group(raw, cid):
+    record(raw)
+    if raw.get("context_type") != "Course" or str(raw.get("course_id")) != cid:
+        return None
+    gid = identifier(raw.get("id"))
+    count = raw.get("members_count")
+    return dict(
+        id=gid,
+        name=plain(raw.get("name"), 220) or "Canvas group",
+        description=plain(raw.get("description"), 1200),
+        memberCount=count if integer(count) and count >= 0 else None,
+        url=f"{ORIGIN}/groups/{gid}",
+    )
+
+
+def topic_summary(raw, base, announcement):
+    record(raw)
+    tid = identifier(raw.get("id"))
+    author = raw.get("author") if isinstance(raw.get("author"), dict) else {}
+    lock = raw.get("lock_info") if isinstance(raw.get("lock_info"), dict) else {}
+    # Canvas can close a topic to posts while explicitly allowing students to read it.
+    readable = lock.get("can_view") is True
+    return dict(
+        id=tid,
+        title=plain(raw.get("title"), 300) or "Untitled topic",
+        author=plain(author.get("display_name") or raw.get("user_name"), 120),
+        postedAt=plain(raw.get("posted_at"), 80),
+        locked=raw.get("published") is False
+        or (not readable and (raw.get("locked_for_user") is True or lock.get("can_view") is False)),
+        lockExplanation=plain(raw.get("lock_explanation"), 800),
+        announcement=announcement,
+        url=f"{ORIGIN}{base}/discussion_topics/{tid}",
+    )
+
+
+def attachment_links(raw, base):
+    files = raw.get("attachments")
+    files = files[:20] if isinstance(files, list) else []
+    if isinstance(raw.get("attachment"), dict):
+        files = [raw["attachment"], *files]
+    links = {}
+    for file in files:
+        if not isinstance(file, dict) or not isinstance(file.get("url"), str):
+            continue
+        path = file["url"].split("?", 1)[0].split("#", 1)[0].removeprefix(ORIGIN)
+        match = re.fullmatch(
+            rf"(?:{re.escape(base)})?/files/([1-9]\d{{0,15}})(?:/download)?/?", path
+        )
+        if not match:
+            continue
+        href = f"{ORIGIN}{base}/files/{match[1]}"
+        links[href] = dict(
+            name=plain(file.get("display_name") or file.get("filename"), 220) or "Attachment",
+            url=href,
+        )
+    return list(links.values())
+
+
+def normalize_topic(raw, value, base, context_code, announcement):
+    summary = topic_summary(raw, base, announcement)
+    require(
+        summary["id"] == identifier(value.get("topicId"))
+        and raw.get("context_code") in (None, context_code)
+        and (
+            not isinstance(raw.get("is_announcement"), bool)
+            or raw["is_announcement"] == announcement
+        ),
+        "invalid_response",
+    )
+    content = raw.get("message") if isinstance(raw.get("message"), str) else ""
+    children = raw.get("group_topic_children")
+    return dict(
+        **summary,
+        bodyHtml="" if summary["locked"] else cut(content, 0, 60000),
+        bodyTruncated=not summary["locked"] and units(content) > 60000,
+        attachments=[] if summary["locked"] else attachment_links(raw, base),
+        repliesRestricted=raw.get("user_can_see_posts") is False,
+        initialPostRequired=raw.get("require_initial_post") is True,
+        groupDiscussion=bool(raw.get("group_category_id") or children),
+        groupChildren=[
+            dict(groupId=identifier(child.get("group_id")), topicId=identifier(child.get("id")))
+            for child in children[:300]
+            if isinstance(child, dict)
+        ]
+        if isinstance(children, list) and not summary["locked"]
+        else [],
+    )
+
+
+def normalize_thread(raw, base):
+    participants = raw.get("participants")
+    authors = (
+        {
+            str(person.get("id")): plain(person.get("display_name"), 120)
+            for person in participants[:300]
+            if isinstance(person, dict)
+        }
+        if isinstance(participants, list)
+        else {}
+    )
+    roots = raw.get("view")
+    require(isinstance(roots, list), "invalid_response")
+    index = {}
+    replies = []
+    partial = False
+    remaining_text = 100000
+
+    def append(entry, target, depth):
+        nonlocal remaining_text, partial
+        if depth > 12 or len(index) >= 300:
+            partial = True
+            return
+        record(entry)
+        eid = identifier(entry.get("id"))
+        if eid in index:
+            return
+        deleted = entry.get("deleted") is True or entry.get("workflow_state") == "deleted"
+        html = entry.get("message") if isinstance(entry.get("message"), str) and not deleted else ""
+        limit = min(20000, remaining_text)
+        excerpt = cut(html, 0, limit)
+        remaining_text -= units(excerpt)
+        partial |= units(html) > limit
+        reply = dict(
+            id=eid,
+            author="" if deleted else authors.get(str(entry.get("user_id")), ""),
+            postedAt=plain(entry.get("created_at"), 80),
+            deleted=deleted,
+            bodyHtml=excerpt,
+            attachments=[] if deleted else attachment_links(entry, base),
+            replies=[],
+        )
+        index[eid] = reply, depth
+        target.append(reply)
+        nested = entry.get("replies")
+        if isinstance(nested, list):
+            for child in nested:
+                append(child, reply["replies"], depth + 1)
+
+    for root in roots:
+        append(root, replies, 0)
+    if isinstance(raw.get("new_entries"), list):
+        for entry in raw["new_entries"]:
+            record(entry)
+            parent = entry.get("parent_id")
+            if parent is None:
+                append(entry, replies, 0)
+            elif str(parent) in index:
+                reply, depth = index[str(parent)]
+                append(entry, reply["replies"], depth + 1)
+            else:
+                partial = True
+    return dict(replies=replies, partial=partial)
+
+
 def normalize(operation, value):
     require(isinstance(value, dict))
     raw = value.get("raw")
@@ -168,6 +322,40 @@ def normalize(operation, value):
         require(isinstance(raw, list) and len(raw) <= 300)
         return semester_courses(raw, timestamp(value.get("now")))
     cid = identifier(value.get("courseId"))
+    if operation == "canvas.groups":
+        require(isinstance(raw, list) and len(raw) <= 300)
+        return list(
+            {
+                entry["id"]: entry
+                for entry in (community_group(item, cid) for item in raw)
+                if entry
+            }.values()
+        )
+    gid = identifier(value["groupId"]) if value.get("groupId") else None
+    base = f"/groups/{gid}" if gid else f"/courses/{cid}"
+    context_code = f"group_{gid}" if gid else f"course_{cid}"
+    announcement = value.get("announcement") is True
+    if operation == "canvas.topics":
+        require(isinstance(raw, list) and len(raw) <= 300)
+        return list(
+            {
+                entry["id"]: entry
+                for entry in (
+                    topic_summary(item, base, announcement)
+                    for item in raw
+                    if record(item).get("published") is not False
+                    and item.get("context_code") in (None, context_code)
+                    and (
+                        not isinstance(item.get("is_announcement"), bool)
+                        or item["is_announcement"] == announcement
+                    )
+                )
+            }.values()
+        )
+    if operation == "canvas.topic":
+        return normalize_topic(raw, value, base, context_code, announcement)
+    if operation == "canvas.thread":
+        return normalize_thread(record(raw), base)
     if operation == "canvas.assignments":
         require(isinstance(raw, list) and len(raw) <= 300)
         return list({entry["id"]: entry for entry in (assignment(v, cid) for v in raw)}.values())

@@ -1,10 +1,12 @@
 /** Reviewed, single-use submission drafts. Live writes are off unless explicitly enabled. */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { HttpError } from './security.mjs';
 const ORIGIN = 'https://babson.instructure.com';
+const ID = /^[1-9]\d{0,15}$/;
+const UNCERTAIN =
+  'Submission outcome is uncertain. Roger will block another send for this assignment until it can verify the attempt in Canvas.';
 const identifier = (value) => {
-  if (!/^[1-9]\d{0,15}$/.test(String(value ?? '')))
-    throw new HttpError(400, 'Choose an assignment.');
+  if (!ID.test(String(value ?? ''))) throw new HttpError(400, 'Choose an assignment.');
   return String(value);
 };
 const escape = (value) =>
@@ -13,12 +15,118 @@ const escape = (value) =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+
+function journalFor(database) {
+  if (!database?.location?.())
+    throw new Error('Enabled submissions require a durable local journal.');
+  database.exec(`
+    PRAGMA journal_mode = DELETE;
+    PRAGMA synchronous = FULL;
+    CREATE TABLE IF NOT EXISTS canvas_submission_journal (
+      account_id TEXT NOT NULL,
+      course_id TEXT NOT NULL,
+      assignment_id TEXT NOT NULL,
+      claim_id TEXT NOT NULL,
+      digest TEXT NOT NULL,
+      previous_id TEXT NOT NULL,
+      previous_attempt INTEGER NOT NULL,
+      receipt_id TEXT,
+      PRIMARY KEY (account_id, course_id, assignment_id)
+    ) STRICT;
+  `);
+  const read = database.prepare(`
+    SELECT * FROM canvas_submission_journal
+    WHERE account_id = ? AND course_id = ? AND assignment_id = ?
+  `);
+  const reserve = database.prepare(`
+    INSERT INTO canvas_submission_journal
+      (account_id, course_id, assignment_id, claim_id, digest, previous_id, previous_attempt)
+    SELECT ?, ?, ?, ?, ?, ?, ?
+    WHERE (SELECT count(*) FROM canvas_submission_journal) < 2048
+    ON CONFLICT (account_id, course_id, assignment_id) DO UPDATE SET
+      claim_id = excluded.claim_id, digest = excluded.digest,
+      previous_id = excluded.previous_id, previous_attempt = excluded.previous_attempt,
+      receipt_id = NULL
+    WHERE canvas_submission_journal.receipt_id IS NOT NULL
+      AND canvas_submission_journal.previous_attempt + 1 <= excluded.previous_attempt
+      AND canvas_submission_journal.digest <> excluded.digest
+  `);
+  const verify = database.prepare(`
+    UPDATE canvas_submission_journal SET receipt_id = ?
+    WHERE account_id = ? AND course_id = ? AND assignment_id = ? AND claim_id = ?
+      AND receipt_id IS NULL
+  `);
+  return {
+    read: (scope) => read.get(...scope),
+    reserve(scope, claim) {
+      // The reservation must be committed on disk before a remote write can start.
+      if (database.isTransaction) return false;
+      return (
+        reserve.run(
+          ...scope,
+          claim.claim_id,
+          claim.digest,
+          claim.previous_id,
+          claim.previous_attempt,
+        ).changes === 1
+      );
+    },
+    verify(scope, claim, receiptId) {
+      if (database.isTransaction) return false;
+      if (verify.run(receiptId, ...scope, claim.claim_id).changes === 1) return true;
+      const current = read.get(...scope);
+      return current?.claim_id === claim.claim_id && current.receipt_id === receiptId;
+    },
+  };
+}
+
+const digest = (type, content) =>
+  createHash('sha256')
+    .update(JSON.stringify([type, content]))
+    .digest('hex');
+
+function submissionIdentity(value, [accountId, , assignmentId]) {
+  return String(value?.user_id) === accountId && String(value?.assignment_id) === assignmentId;
+}
+
+function attempt(value, scope) {
+  const id = String(value?.id ?? '');
+  const count = value?.attempt ?? 0;
+  if (
+    !submissionIdentity(value, scope) ||
+    !Number.isSafeInteger(count) ||
+    count < 0 ||
+    (id && !ID.test(id)) ||
+    (!id && count !== 0)
+  )
+    throw new HttpError(502, 'Canvas did not identify the current submission attempt.');
+  return { id, attempt: count };
+}
+
+function matchesReceipt(value, scope, claim) {
+  const type = value?.submission_type;
+  const content = type === 'online_url' ? value?.url : value?.body;
+  const receiptId = String(value?.id ?? '');
+  return (
+    submissionIdentity(value, scope) &&
+    ID.test(receiptId) &&
+    (!claim.previous_id || receiptId === claim.previous_id) &&
+    value.attempt === claim.previous_attempt + 1 &&
+    Number.isFinite(Date.parse(value.submitted_at)) &&
+    ['submitted', 'graded', 'pending_review'].includes(value.workflow_state) &&
+    typeof content === 'string' &&
+    digest(type, content) === claim.digest
+  );
+}
+
 export function createSubmissionService({
   enabled = false,
   clock = Date.now,
   fetcher = fetch,
   readAssignment,
+  journalDatabase,
 } = {}) {
+  const journal = enabled ? journalFor(journalDatabase) : null;
   async function transport(token, pathname, { body, signal } = {}) {
     const response = await fetcher(ORIGIN + pathname, {
       method: body ? 'POST' : 'GET',
@@ -59,7 +167,12 @@ export function createSubmissionService({
     }
     return JSON.parse(Buffer.concat(parts).toString());
   }
-  function allowed(assignment, type) {
+  function allowed(assignment, type, courseId, assignmentId) {
+    if (
+      String(assignment?.id) !== assignmentId ||
+      (assignment.courseId != null && String(assignment.courseId) !== courseId)
+    )
+      throw new HttpError(502, 'Canvas returned a different assignment.');
     const locked = assignment.locked ?? assignment.locked_for_user;
     if (locked || assignment.canSubmit === false || assignment.can_submit === false)
       throw new HttpError(409, 'Canvas currently does not allow you to submit this assignment.');
@@ -73,6 +186,42 @@ export function createSubmissionService({
     const types = assignment.submissionTypes ?? assignment.submission_types ?? [];
     if (!types.includes(type))
       throw new HttpError(400, 'That submission type is not accepted by this assignment.');
+  }
+  function scopeFor(session, courseId, assignmentId) {
+    const account = String(session.profile?.id ?? '');
+    if (!ID.test(account) || !session.token)
+      throw new HttpError(409, 'Reconnect Canvas before reviewing a live submission.');
+    return [account, courseId, assignmentId];
+  }
+  const routeFor = ([, course, assignment]) =>
+    `/api/v1/courses/${course}/assignments/${assignment}/submissions`;
+  const readCurrent = (token, scope, signal) =>
+    transport(token, `${routeFor(scope)}/${scope[0]}`, { signal });
+  async function reconcile(token, scope, claim, { sent, signal } = {}) {
+    const receipt = await readCurrent(token, scope, signal);
+    if (
+      !matchesReceipt(receipt, scope, claim) ||
+      (sent != null &&
+        (!matchesReceipt(sent, scope, claim) || String(sent.id) !== String(receipt.id)))
+    )
+      return null;
+    if (!journal.verify(scope, claim, String(receipt.id))) return null;
+    return {
+      verified: true,
+      id: receipt.id,
+      attempt: receipt.attempt,
+      submittedAt: receipt.submitted_at,
+      state: receipt.workflow_state,
+    };
+  }
+  function assertAvailable(row, payloadDigest) {
+    if (!row) return;
+    if (!row.receipt_id) throw new HttpError(409, UNCERTAIN);
+    if (row.digest === payloadDigest)
+      throw new HttpError(
+        409,
+        `Canvas already confirmed this work as attempt ${row.previous_attempt + 1}.`,
+      );
   }
   return {
     async review(session, input, { signal } = {}) {
@@ -110,8 +259,44 @@ export function createSubmissionService({
           submission_type: type,
           body: `<p>${escape(content).replaceAll('\n', '<br>')}</p>`,
         };
-      const assignment = await readAssignment(session.token, courseId, assignmentId, { signal });
-      allowed(assignment, type);
+      const token = session.token;
+      const scope = enabled ? scopeFor(session, courseId, assignmentId) : null;
+      const payloadDigest = digest(type, payload.url ?? payload.body);
+      let baseline = null;
+      if (scope) {
+        const row = journal.read(scope);
+        if (row && !row.receipt_id) {
+          const receipt = await reconcile(token, scope, row, { signal }).catch(() => null);
+          if (!receipt) throw new HttpError(409, UNCERTAIN);
+          throw new HttpError(
+            409,
+            `Canvas confirmed the earlier send as attempt ${receipt.attempt}. Review again if you need to submit different work.`,
+          );
+        }
+        assertAvailable(row, payloadDigest);
+        const current = await readCurrent(token, scope, signal);
+        baseline = attempt(current, scope);
+        if (
+          baseline.attempt > 0 &&
+          matchesReceipt(current, scope, {
+            previous_id: baseline.id,
+            previous_attempt: baseline.attempt - 1,
+            digest: payloadDigest,
+          })
+        )
+          throw new HttpError(
+            409,
+            `Canvas already recorded this work as attempt ${baseline.attempt}.`,
+          );
+      }
+      const assignment = await readAssignment(token, courseId, assignmentId, { signal });
+      allowed(assignment, type, courseId, assignmentId);
+      if (
+        session.token !== token ||
+        (scope && scopeFor(session, courseId, assignmentId)[0] !== scope[0])
+      )
+        throw new HttpError(409, 'Your Canvas connection changed. Review the submission again.');
+      if (scope) assertAvailable(journal.read(scope), payloadDigest);
       const draft = {
         id: randomUUID(),
         courseId,
@@ -121,7 +306,10 @@ export function createSubmissionService({
         content,
         payload,
         expires: clock() + 10 * 60_000,
-        token: session.token,
+        token,
+        scope,
+        digest: payloadDigest,
+        baseline,
       };
       session.submissionDraft = draft;
       return {
@@ -161,58 +349,38 @@ export function createSubmissionService({
       const assignment = await readAssignment(token, draft.courseId, draft.assignmentId, {
         signal,
       });
-      allowed(assignment, draft.type);
-      if (session.token !== token)
+      allowed(assignment, draft.type, draft.courseId, draft.assignmentId);
+      const scope = scopeFor(session, draft.courseId, draft.assignmentId);
+      if (session.token !== token || scope[0] !== draft.scope?.[0])
         throw new HttpError(409, 'Your Canvas connection changed. Review the submission again.');
-      const route = `/api/v1/courses/${draft.courseId}/assignments/${draft.assignmentId}/submissions`;
-      let sent;
-      try {
-        sent = await transport(token, route, { body: { submission: draft.payload }, signal });
-      } catch {
-        throw new HttpError(
-          502,
-          'Submission outcome is uncertain. Check Canvas before reviewing or submitting again.',
-        );
-      }
-      let receipt;
-      try {
-        receipt = await transport(token, route + '/self', { signal });
-      } catch {
-        throw new HttpError(
-          502,
-          'The send request completed, but receipt verification failed. Check Canvas; do not blindly retry.',
-        );
-      }
+      assertAvailable(journal.read(scope), draft.digest);
+      const current = attempt(await readCurrent(token, scope, signal), scope);
       if (
-        !sent.id ||
-        receipt.id !== sent.id ||
-        receipt.attempt !== sent.attempt ||
-        !receipt.submitted_at ||
-        receipt.submission_type !== draft.type ||
-        !['submitted', 'graded', 'pending_review'].includes(receipt.workflow_state)
+        session.token !== token ||
+        scopeFor(session, draft.courseId, draft.assignmentId)[0] !== scope[0] ||
+        current.id !== draft.baseline.id ||
+        current.attempt !== draft.baseline.attempt
       )
-        throw new HttpError(
-          502,
-          'Canvas accepted the request, but its receipt could not be verified. Check Canvas; do not blindly retry.',
-        );
-      if (
-        String(receipt.assignment_id) !== draft.assignmentId ||
-        String(sent.assignment_id) !== draft.assignmentId ||
-        (draft.type === 'online_url'
-          ? receipt.url !== draft.payload.url || sent.url !== draft.payload.url
-          : receipt.body !== draft.payload.body || sent.body !== draft.payload.body)
-      )
-        throw new HttpError(
-          502,
-          'The Canvas receipt does not match the reviewed work. Check Canvas; do not blindly retry.',
-        );
-      return {
-        verified: true,
-        id: receipt.id,
-        attempt: receipt.attempt,
-        submittedAt: receipt.submitted_at,
-        state: receipt.workflow_state,
+        throw new HttpError(409, 'Canvas changed since this review. Review the submission again.');
+      signal?.throwIfAborted();
+      const claim = {
+        claim_id: draft.id,
+        digest: draft.digest,
+        previous_id: draft.baseline.id,
+        previous_attempt: draft.baseline.attempt,
       };
+      if (!journal.reserve(scope, claim))
+        throw new HttpError(
+          409,
+          'The submission journal could not reserve this send. Check Canvas.',
+        );
+      const sent = await transport(token, routeFor(scope), {
+        body: { submission: draft.payload },
+        signal,
+      }).catch(() => undefined);
+      const receipt = await reconcile(token, scope, claim, { sent, signal }).catch(() => null);
+      if (!receipt) throw new HttpError(502, UNCERTAIN);
+      return receipt;
     },
   };
 }

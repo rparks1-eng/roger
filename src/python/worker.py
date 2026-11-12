@@ -38,6 +38,10 @@ LIMITS = {
             "canvas.assignment",
             "canvas.assignments",
             "canvas.page",
+            "canvas.groups",
+            "canvas.topics",
+            "canvas.topic",
+            "canvas.thread",
         )
     },
 }

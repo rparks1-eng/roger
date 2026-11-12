@@ -20,12 +20,13 @@ import { pythonDomain } from './python-domain.mjs';
 import { createNarrationService } from './narration.mjs';
 import { createConnectionService, ConnectionError } from './connections.mjs';
 import { createFeatureBuilder } from './builder.mjs';
-import { createAppChangeService } from './app-changes.mjs';
+import { captureAppAssets, createAppChangeService } from './app-changes.mjs';
+import { createAppPreview } from './app-preview.mjs';
 import { recoveryHTML, recoveryCSS, recoveryJS } from './app-recovery.mjs';
 import { createAppearanceBuilder } from './appearance-builder.mjs';
 import { createResourceSearch } from './web-resources.mjs';
 import { createMemoryStore } from './memory.mjs';
-import { createCourseExport } from './course-export.mjs';
+import { createCourseArchive, createCourseExport } from './course-export.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const readerAssets = new Map([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
@@ -79,12 +80,20 @@ export const readerAssets = new Map([
     'appearance-preview',
     'app-changes-ui',
     'resources-ui',
+    'student-tools',
+    'reading-library',
     'homework-planner',
     'roger-navigation',
     'memory-ui',
     'chat-format',
   ].map((name) => [`/client/${name}.mjs`, [`src/client/${name}.mjs`, 'text/javascript']]),
 ]);
+export async function startRecordingDemo(assetRoot = root) {
+  return createAppPreview({
+    files: await captureAppAssets(assetRoot, readerAssets),
+    recording: true,
+  });
+}
 export function createReaderServer({
   canvasAdapter = canvas,
   studyAdapter = study,
@@ -117,6 +126,9 @@ export function createReaderServer({
     return connections.get(session);
   };
   let activeStudy = false;
+  let activeCourseArchive = false;
+  let recording;
+  let startingRecording;
   const submissions = createSubmissionService({
     ...submissionOptions,
     clock,
@@ -157,6 +169,20 @@ export function createReaderServer({
     try {
       assertHost(req);
       const url = new URL(req.url, `http://${req.headers.host}`);
+      if (req.method === 'GET' && url.pathname === '/demo') {
+        const site = req.headers['sec-fetch-site'];
+        if (site && site !== 'same-origin' && site !== 'none')
+          throw new HttpError(403, 'Open Demo mode from Roger settings.');
+        if (!recording || recording.expiresAt <= Date.now()) {
+          startingRecording ??= startRecordingDemo(assetRoot)
+            .then((preview) => (recording = preview))
+            .finally(() => (startingRecording = undefined));
+          await startingRecording;
+        }
+        res.writeHead(303, { Location: recording.url });
+        res.end();
+        return;
+      }
       // Keep the live app on its canonical host; previews use localhost so cookies differ.
       if (url.hostname === 'localhost' && ['/', '/app-recovery'].includes(url.pathname)) {
         res.statusCode = 307;
@@ -200,7 +226,12 @@ export function createReaderServer({
             session.profile = configuredCanvas.profile;
           }
         }
-        json({ csrf: session.csrf, canvas: session.profile, ephemeral: true });
+        json({
+          csrf: session.csrf,
+          canvas: session.profile,
+          ephemeral: true,
+          recordingAvailable: true,
+        });
         return;
       }
       if (req.method === 'POST')
@@ -259,25 +290,22 @@ export function createReaderServer({
       }
       if (req.method === 'POST' && url.pathname === '/api/memory/record') {
         const body = await readJson(req, 98304, controller.signal);
+        if (!body || typeof body !== 'object' || Array.isArray(body))
+          throw new HttpError(400, 'Choose a completed conversation to save.');
         if (memoryStore.settings().paused) {
           json({ paused: true });
           return;
         }
-        const scope = { courseId: body.courseId || '', assignmentId: body.assignmentId || '' };
-        const first = memoryStore.appendTurn({
-          ...scope,
+        const saved = memoryStore.recordExchange({
+          courseId: body.courseId,
+          assignmentId: body.assignmentId,
+          documentId: body.documentId,
           threadId: body.threadId,
-          role: 'user',
-          content: body.message,
+          message: body.message,
+          reply: body.reply,
+          citations: body.citations,
         });
-        memoryStore.appendTurn({
-          ...scope,
-          threadId: first.threadId,
-          role: 'assistant',
-          content: body.reply,
-          citations: body.citations || [],
-        });
-        json({ threadId: first.threadId });
+        json({ threadId: saved.threadId });
         return;
       }
       if (req.method === 'POST' && url.pathname.startsWith('/api/memory/')) {
@@ -348,21 +376,46 @@ export function createReaderServer({
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/canvas/export') {
+        if (!session.token) throw new HttpError(409, 'Connect Canvas first.');
+        const format = url.searchParams.get('format') || 'json';
+        if (!['json', 'markdown', 'zip'].includes(format))
+          throw new HttpError(400, 'Choose a course snapshot or ZIP archive.');
+        const archived = format === 'zip';
+        if (archived && activeCourseArchive)
+          throw new HttpError(429, 'Another course archive is already being prepared.');
         const id = url.searchParams.get('courseId');
-        const course = await canvasAdapter.readCanvasCourse(session.token, id, {
-          signal: controller.signal,
-        });
-        const syllabus = await canvasAdapter.readCanvasSyllabus(session.token, id, {
-          signal: controller.signal,
-        });
-        const result = createCourseExport(
-          course,
-          syllabus,
-          url.searchParams.get('format') || 'json',
-        );
-        res.setHeader('Content-Type', result.mime);
-        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
-        res.end(result.content);
+        const options = { signal: controller.signal };
+        const unlockArchive = () => {
+          res.removeListener('finish', unlockArchive);
+          res.removeListener('close', unlockArchive);
+          activeCourseArchive = false;
+        };
+        if (archived) activeCourseArchive = true;
+        try {
+          const course = await canvasAdapter.readCanvasCourse(session.token, id, options);
+          const syllabus = await canvasAdapter.readCanvasSyllabus(session.token, id, options);
+          const result = archived
+            ? await createCourseArchive(course, syllabus, {
+                listing: await canvasAdapter.listCanvasExportFiles(session.token, id, options),
+                readFile: (fileId, readOptions) =>
+                  canvasAdapter.getCanvasExportFile(session.token, id, fileId, readOptions),
+                signal: controller.signal,
+                now: clock,
+              })
+            : createCourseExport(course, syllabus, format, { now: clock });
+          res.setHeader('Content-Type', result.mime);
+          res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+          if (archived) {
+            options.signal.throwIfAborted();
+            res.setHeader('X-Reader-Filename', encodeURIComponent(result.fileName));
+            res.once('finish', unlockArchive);
+            res.once('close', unlockArchive);
+          }
+          res.end(result.content);
+        } catch (error) {
+          if (archived) unlockArchive();
+          throw error;
+        }
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/connections') {
@@ -418,20 +471,14 @@ export function createReaderServer({
         let memoryWarning = null;
         if (!memory.paused) {
           try {
-            const saved = memoryStore.appendTurn({
+            const saved = memoryStore.recordExchange({
               ...scope,
               threadId,
-              role: 'user',
-              content: body.message,
-            });
-            threadId = saved.threadId;
-            memoryStore.appendTurn({
-              ...scope,
-              threadId,
-              role: 'assistant',
-              content: result.text,
+              message: body.message,
+              reply: result.text,
               citations: body.citations || [],
             });
+            threadId = saved.threadId;
           } catch (error) {
             memoryWarning = error.message;
           }
@@ -630,6 +677,31 @@ export function createReaderServer({
         );
         return;
       }
+      if (req.method === 'GET' && url.pathname === '/api/canvas/community') {
+        const { searchParams } = url;
+        json(
+          await canvasAdapter.listCanvasCommunity(
+            session.token,
+            searchParams.get('courseId'),
+            { section: searchParams.get('section'), groupId: searchParams.get('groupId') },
+            { signal: controller.signal },
+          ),
+        );
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/canvas/topic') {
+        const { searchParams } = url;
+        json(
+          await canvasAdapter.readCanvasCommunityTopic(
+            session.token,
+            searchParams.get('courseId'),
+            searchParams.get('topicId'),
+            { section: searchParams.get('section'), groupId: searchParams.get('groupId') },
+            { signal: controller.signal },
+          ),
+        );
+        return;
+      }
       if (req.method === 'POST' && url.pathname === '/api/canvas/submission/review') {
         json(
           await submissions.review(session, await readJson(req, 65_536, controller.signal), {
@@ -811,6 +883,9 @@ export function createReaderServer({
     sessions.clear();
     memoryStore.close();
     void Promise.resolve(appChanges.dispose()).catch(() => {});
+    void Promise.resolve(startingRecording ?? recording)
+      .then((preview) => preview?.close())
+      .catch(() => {});
   });
   return server;
 }

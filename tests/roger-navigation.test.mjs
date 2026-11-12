@@ -18,6 +18,15 @@ const index = {
 test('class code, natural title, and course-constrained assignment navigation', () => {
   assert.equal(resolveNavigation('pull up FIN3515 syllabus', index).target.section, 'syllabus');
   assert.equal(
+    resolveNavigation('open OIM 3641 announcements', index).target.section,
+    'announcements',
+  );
+  assert.equal(
+    resolveNavigation('open FIN3515 discussion board', index).target.section,
+    'discussions',
+  );
+  assert.equal(resolveNavigation('open FIN3515 groups', index).target.section, 'groups');
+  assert.equal(
     resolveNavigation('question about corporate financial modeling', index).target.courseId,
     '1',
   );
@@ -33,6 +42,10 @@ test('ambiguous assignments offer choices and unrelated questions do not navigat
     resolveNavigation('pull up this class', index, { courseId: '1' }).target.courseId,
     '1',
   );
+  assert.deepEqual(resolveNavigation('show discussion board', index, { courseId: '2' }).target, {
+    courseId: '2',
+    section: 'discussions',
+  });
 });
 
 test('Roman numeral assignment names require full words', () => {

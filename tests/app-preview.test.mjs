@@ -124,6 +124,7 @@ test('preview denies parent cookies, mutations, cross-origin requests, arbitrary
     for (const endpoint of [
       '/api/app-changes/apply',
       '/api/connections/ask',
+      '/api/demo/ask',
       '/api/canvas/submission/commit',
       '/api/documents/ocr',
     ]) {
@@ -181,4 +182,23 @@ test('preview closes independently, does not survive expiration, and validates c
     /twenty minutes/,
   );
   await assert.rejects(createAppPreview({ files: new Map() }), /bounded captured app/);
+});
+
+test('recording mode uses a separate cookie from app-change previews', async (t) => {
+  const preview = await createAppPreview({ files: assets() });
+  t.after(() => preview.close());
+  const demo = await createAppPreview({ files: assets(), recording: true });
+  t.after(() => demo.close());
+  const { cookie: previewCookie } = await open(preview);
+  const { response, cookie: demoCookie } = await open(demo);
+  assert.notEqual(previewCookie.split('=')[0], demoCookie.split('=')[0]);
+  assert.equal(response.headers['clear-site-data'], '"storage"');
+  assert.equal(
+    (await raw(demo.url, { path: '/api/session', headers: { Cookie: previewCookie } })).status,
+    401,
+  );
+  assert.equal(
+    (await raw(preview.url, { path: '/api/session', headers: { Cookie: demoCookie } })).status,
+    401,
+  );
 });

@@ -72,6 +72,65 @@ test('follow-up questions inherit recent turns without lexical overlap and dedup
   }
 });
 
+test('reading exchanges are atomic, retain source provenance and do not enter general recall', () => {
+  const store = fixture();
+  const documentId = 'a'.repeat(64);
+  const differentReading = 'b'.repeat(64);
+  const citation = {
+    documentId,
+    revision: 'c'.repeat(64),
+    title: 'Reading',
+    page: 2,
+    quote: 'North harbor',
+  };
+  try {
+    const { threadId } = store.recordExchange({
+      documentId,
+      message: 'Why study North harbor?',
+      reply: 'The reading explains how it changed.',
+      citations: [citation],
+    });
+    const saved = store.readThread({ threadId, documentId });
+    assert.equal(saved.thread.documentId, documentId);
+    assert.equal(saved.thread.courseId, '');
+    assert.deepEqual(
+      saved.turns.map(({ role }) => role),
+      ['user', 'assistant'],
+    );
+    assert.deepEqual(saved.turns[1].citations, [citation]);
+    assert.equal(store.retrieve({ query: 'harbor' }).context, '');
+    assert.equal(store.retrieve({ query: 'harbor', documentId: differentReading }).context, '');
+    assert.equal(store.listThreads({ documentId }).total, 1);
+    assert.throws(() => store.readThread({ threadId, documentId: differentReading }), {
+      status: 403,
+    });
+    assert.throws(() => store.retrieve({ query: 'harbor', courseId: 'reading:' + documentId }), {
+      status: 400,
+    });
+    assert.throws(
+      () =>
+        store.recordExchange({
+          documentId,
+          threadId,
+          message: 'Must roll back',
+          reply: 'Source is invalid',
+          citations: [{ ...citation, page: 0 }],
+        }),
+      { status: 400 },
+    );
+    assert.equal(store.readThread({ threadId, documentId }).total, 2);
+    store.settings({ paused: true });
+    assert.throws(
+      () =>
+        store.recordExchange({ documentId, threadId, message: 'Paused question', reply: 'Answer' }),
+      { status: 409 },
+    );
+    assert.equal(store.readThread({ threadId, documentId }).total, 2);
+  } finally {
+    store.close();
+  }
+});
+
 test('pause prevents saving and retrieval while inspection, export and forgetting remain available', () => {
   const store = fixture();
   try {

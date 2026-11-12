@@ -8,11 +8,11 @@
       "sha256": "0f8a3fb971ae4fc8695e1ff20487799e89dd927d90e652e21ea5b1ef22149ca9",
       "dependencyLockSha256": "ba0cc463d8cf741c9bfc6a9f5182fb6633fa95cf1819b23a15947a387c731075"
     },
-    "fingerprint": "361a9c34720f98543880f0652f0ddbfc8dd28c8d9bfdd396c86bcca7ff97e404",
+    "fingerprint": "06cdc63ac5c788a6756fa90d2d24b6f124e2e78717ce0bfd5640360dff584055",
     "modules": [
       {
         "file": "src/client/api.mjs",
-        "sha256": "9085cc25a7a7b8add28f8d57b8102c63ff3b75aa1924e0de423f9f5825f1102e",
+        "sha256": "87c8971a8ae50044176b2bb6295208f2ec99c45f11b3170931ecac496ce5f5a2",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -37,7 +37,7 @@
       },
       {
         "file": "src/client/app.mjs",
-        "sha256": "94b09545adfab24df9ac5d9af566ea43085abc79fd75c1c9f5e9397c3f3f027e",
+        "sha256": "1a107ca51b810a459c840db2deaa06425804baa6c06bc12d1097a9a4fa99365d",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/api.mjs",
@@ -53,10 +53,12 @@
           "src/client/homework-planner.mjs",
           "src/client/memory-ui.mjs",
           "src/client/pdf-workspace.mjs",
+          "src/client/reading-library.mjs",
           "src/client/resources-ui.mjs",
           "src/client/roger-navigation.mjs",
           "src/client/roger-widget.mjs",
-          "src/client/speech.mjs"
+          "src/client/speech.mjs",
+          "src/client/student-tools.mjs"
         ],
         "importedBy": [],
         "dependencies": [
@@ -243,6 +245,20 @@
             "locationStatus": "located"
           },
           {
+            "to": "src/client/reading-library.mjs",
+            "specifier": "/client/reading-library.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "/client/reading-library.mjs",
+                "line": 916,
+                "column": 46,
+                "syntax": "dynamic-import"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
             "to": "src/client/resources-ui.mjs",
             "specifier": "/client/resources-ui.mjs",
             "kind": "source import; not runtime data flow",
@@ -297,6 +313,20 @@
               }
             ],
             "locationStatus": "located"
+          },
+          {
+            "to": "src/client/student-tools.mjs",
+            "specifier": "/client/student-tools.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "/client/student-tools.mjs",
+                "line": 930,
+                "column": 8,
+                "syntax": "dynamic-import"
+              }
+            ],
+            "locationStatus": "located"
           }
         ],
         "otherImports": [],
@@ -340,7 +370,7 @@
       },
       {
         "file": "src/client/canvas-ui.mjs",
-        "sha256": "541a850ed1ad3959dcc47e8a6fd8b5a36bd3ad0965248ea04f52c34470a44bb9",
+        "sha256": "da67756e0711e6ce4c75a3595e90f909e25e752d65277f1b5a67e2a2cfb7bb3c",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/canvas-display.mjs",
@@ -469,7 +499,7 @@
       },
       {
         "file": "src/client/course-study-ui.mjs",
-        "sha256": "4e45ed1b0ea3b0f2e8f1b27a2fa28b79caecb6311b35bcf7cf7ab65fc732ad1a",
+        "sha256": "415df717539a58953f22757c60f80603dc94e490427a2f699a51d8e4d88597fa",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/study-ui.mjs",
@@ -542,6 +572,7 @@
         "imports": [],
         "importedBy": [
           "src/client/app.mjs",
+          "src/client/reading-library.mjs",
           "src/client/study-ui.mjs",
           "src/client/syllabus-ui.mjs"
         ],
@@ -585,7 +616,7 @@
       },
       {
         "file": "src/client/memory-ui.mjs",
-        "sha256": "c2fa599d6d6350aafc7847080f69a56033693c77592416a297658dafb9d9b78d",
+        "sha256": "8334954e58b0fd5a01db7d6cf628e4429b0a80d2a356877846a880b0b104afdd",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/chat-format.mjs"
@@ -633,8 +664,37 @@
         "dynamicImports": []
       },
       {
+        "file": "src/client/reading-library.mjs",
+        "sha256": "7224ffb6a8627791a0f7b5e0d97fe9603f7a79046365e72244fc72fc26fa8178",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [
+          "src/client/documents.mjs"
+        ],
+        "importedBy": [
+          "src/client/app.mjs"
+        ],
+        "dependencies": [
+          {
+            "to": "src/client/documents.mjs",
+            "specifier": "/client/documents.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "/client/documents.mjs",
+                "line": 1,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          }
+        ],
+        "otherImports": [],
+        "dynamicImports": []
+      },
+      {
         "file": "src/client/resources-ui.mjs",
-        "sha256": "311f45a14e2c9197ff267fd0b8181521b6f78e222b79142d1255874b397252a1",
+        "sha256": "2b630f09367824baee2c728e8ed3413b901493c1640ae5f105ac297f16829553",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -646,7 +706,7 @@
       },
       {
         "file": "src/client/roger-navigation.mjs",
-        "sha256": "4c1d1b3ebbdd9d798daf4a479d736815287d3421d48cf5e2ddcfa85610729753",
+        "sha256": "88d51cd2f41799fb22a261a3b982c8f602aa53bb1f04b998c2f5ee34c589774e",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -681,8 +741,20 @@
         "dynamicImports": []
       },
       {
+        "file": "src/client/student-tools.mjs",
+        "sha256": "3675bea8d9be90eeac0d19860ee730953ccc2ee576e8c41a10fd9db615071df6",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [],
+        "importedBy": [
+          "src/client/app.mjs"
+        ],
+        "dependencies": [],
+        "otherImports": [],
+        "dynamicImports": []
+      },
+      {
         "file": "src/client/study-ui.mjs",
-        "sha256": "974c776429b39a0162c3ad3000f106e214ffbb0eec9a5e182d403a5bb958e9d6",
+        "sha256": "817b9578e80e1725656bd65bd28db83fa033530af54cb1db7260220a2f45b392",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/documents.mjs",
@@ -852,7 +924,7 @@
       },
       {
         "file": "src/server/app-changes.mjs",
-        "sha256": "d6b5cfab62ef7e2c519f72848ed8ed5d6e2cb4d919d67064fae510cc69f55b4b",
+        "sha256": "830f1deb9434efae01a88e51f6a6e2ab4d5736cc4d5ebfc2c143baaa18840744",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/app-preview.mjs",
@@ -939,13 +1011,46 @@
       },
       {
         "file": "src/server/app-preview.mjs",
-        "sha256": "02be0978365ae5a0edc78133203e5e93bce91c5fccc5831e71e2ae9d8a9193bd",
+        "sha256": "96094f5f3d280e6b7ef2eb489d7b7d3211c200aa9e989467852ef37c08b8c24a",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
-        "imports": [],
-        "importedBy": [
-          "src/server/app-changes.mjs"
+        "imports": [
+          "src/server/demo-answers.mjs",
+          "src/server/security.mjs"
         ],
-        "dependencies": [],
+        "importedBy": [
+          "src/server/app-changes.mjs",
+          "src/server/http.mjs"
+        ],
+        "dependencies": [
+          {
+            "to": "src/server/demo-answers.mjs",
+            "specifier": "./demo-answers.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./demo-answers.mjs",
+                "line": 4,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
+            "to": "src/server/security.mjs",
+            "specifier": "./security.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./security.mjs",
+                "line": 5,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          }
+        ],
         "otherImports": [
           {
             "specifier": "node:crypto",
@@ -1079,11 +1184,12 @@
       },
       {
         "file": "src/server/canvas-download.mjs",
-        "sha256": "a287bfac45370006efa93376d31d6fc1989f9b06bfba1cbbe4a7dc2392b79839",
+        "sha256": "ca7bbf0fbbbf3755d6ea7d7beccd2fdee33c4d683ee1ed2e946472d04bbc6d44",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
-          "src/server/canvas.mjs"
+          "src/server/canvas.mjs",
+          "src/server/course-export.mjs"
         ],
         "dependencies": [],
         "otherImports": [],
@@ -1091,7 +1197,7 @@
       },
       {
         "file": "src/server/canvas.mjs",
-        "sha256": "d56dbb20ac5febde355fd215eb138f72b4d728c9220468e016d9c6c6eee0cf05",
+        "sha256": "b719c26a760ea9ef842a5295184daea96fe326ba55288627e110b310ffdfd053",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/canvas-download.mjs",
@@ -1208,9 +1314,10 @@
       },
       {
         "file": "src/server/course-export.mjs",
-        "sha256": "72994d6e7b372f546016f28d3b1700d0458cb09b8c7b44c64b47c369cbcc9b08",
+        "sha256": "f3a16496706a70bef17f61c2ecd1cff29641cc3cd9435365796547e8b735fd8c",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
+          "src/server/canvas-download.mjs",
           "src/server/security.mjs"
         ],
         "importedBy": [
@@ -1218,13 +1325,27 @@
         ],
         "dependencies": [
           {
+            "to": "src/server/canvas-download.mjs",
+            "specifier": "./canvas-download.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./canvas-download.mjs",
+                "line": 3,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
             "to": "src/server/security.mjs",
             "specifier": "./security.mjs",
             "kind": "source import; not runtime data flow",
             "locations": [
               {
                 "specifier": "./security.mjs",
-                "line": 2,
+                "line": 4,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1232,6 +1353,26 @@
             "locationStatus": "located"
           }
         ],
+        "otherImports": [
+          {
+            "specifier": "node:zlib",
+            "line": 2,
+            "column": 1,
+            "syntax": "ImportDeclaration",
+            "resolution": "outside this source map; not traversed"
+          }
+        ],
+        "dynamicImports": []
+      },
+      {
+        "file": "src/server/demo-answers.mjs",
+        "sha256": "39f33479f176b8f1df9d961613508d899abe6746d7712e7320df03947efbec09",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [],
+        "importedBy": [
+          "src/server/app-preview.mjs"
+        ],
+        "dependencies": [],
         "otherImports": [],
         "dynamicImports": []
       },
@@ -1302,10 +1443,11 @@
       },
       {
         "file": "src/server/http.mjs",
-        "sha256": "d6d6ed89bd23363ee8b8ea16affdc4e6bd70b22cd47d4beeda3e9d927aa6d2cf",
+        "sha256": "f4084add7acd4bb1ac0e809be37606093d584d93867369d23508d76686bd66fb",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/app-changes.mjs",
+          "src/server/app-preview.mjs",
           "src/server/app-recovery.mjs",
           "src/server/appearance-builder.mjs",
           "src/server/builder.mjs",
@@ -1341,13 +1483,27 @@
             "locationStatus": "located"
           },
           {
+            "to": "src/server/app-preview.mjs",
+            "specifier": "./app-preview.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./app-preview.mjs",
+                "line": 24,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
             "to": "src/server/app-recovery.mjs",
             "specifier": "./app-recovery.mjs",
             "kind": "source import; not runtime data flow",
             "locations": [
               {
                 "specifier": "./app-recovery.mjs",
-                "line": 24,
+                "line": 25,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1361,7 +1517,7 @@
             "locations": [
               {
                 "specifier": "./appearance-builder.mjs",
-                "line": 25,
+                "line": 26,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1417,7 +1573,7 @@
             "locations": [
               {
                 "specifier": "./course-export.mjs",
-                "line": 28,
+                "line": 29,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1445,7 +1601,7 @@
             "locations": [
               {
                 "specifier": "./memory.mjs",
-                "line": 27,
+                "line": 28,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1543,7 +1699,7 @@
             "locations": [
               {
                 "specifier": "./web-resources.mjs",
-                "line": 26,
+                "line": 27,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1585,7 +1741,7 @@
       },
       {
         "file": "src/server/index.mjs",
-        "sha256": "e894d25297062ff030ca697f6b8dfde086a8f7e580574affaa8cb50d1a225333",
+        "sha256": "9b796257feb5a30399d6b3fc8580f069cb4eccdd75adadd230630e7c705d0115",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/http.mjs",
@@ -1642,7 +1798,7 @@
       },
       {
         "file": "src/server/memory.mjs",
-        "sha256": "11f3ddafeaf39f55a6af53e6a1173c31250bb1966f259c17d48772d3558f2cb5",
+        "sha256": "f0bcd643f454e129d6cbdee333dc0ef921035fdb734f318cce28becfeb83e076",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/security.mjs"
@@ -1814,7 +1970,7 @@
       },
       {
         "file": "src/server/python-domain.mjs",
-        "sha256": "985432f20fde8c9442963c980a299d762446efb63b96ac3dd64aff18a0678893",
+        "sha256": "3811a84704836a0f9d36b1e1c2aded44ac07222ed2b59b5b88852a00b6aab6e1",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -1934,6 +2090,7 @@
         "imports": [],
         "importedBy": [
           "src/server/app-changes.mjs",
+          "src/server/app-preview.mjs",
           "src/server/appearance-builder.mjs",
           "src/server/builder.mjs",
           "src/server/course-export.mjs",
@@ -1957,7 +2114,7 @@
       },
       {
         "file": "src/server/study.mjs",
-        "sha256": "5fa3c4646e3648d1f43a227ed88518b1d66fba16af7edc873a5e284adc2f79ac",
+        "sha256": "fd91bcea6a0883ed131b00770c4d1ff51f99d3dee27abf638b29f56373b612f0",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/core/cli-protocol.ts",
@@ -2016,7 +2173,7 @@
       },
       {
         "file": "src/server/submissions.mjs",
-        "sha256": "f708fdf746107c7f29ba3ea11efd4635c20fef1e1fb50574ac56bdca81a9344f",
+        "sha256": "137f699538dfc81d4dc0bcd62a72624f73f2ca92f7df9703377d0406dacd5586",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/security.mjs"
@@ -2098,11 +2255,11 @@
     ]
   },
   "coverage": "JavaScript/TypeScript and Python static imports plus verified worker declarations; no runtime data lineage or provider reachability claim.",
-  "fingerprint": "06ad0d03641ff88ec294cd8958dac936b3ba736d4a6e7e9af369abf50cd40910",
+  "fingerprint": "d633fa7fd35b79accd4d0111c4f1b60e148a3ed93d41c9dce182610aa05e7fd4",
   "sources": [
     {
       "path": "src/client/api.mjs",
-      "sha256": "9085cc25a7a7b8add28f8d57b8102c63ff3b75aa1924e0de423f9f5825f1102e"
+      "sha256": "87c8971a8ae50044176b2bb6295208f2ec99c45f11b3170931ecac496ce5f5a2"
     },
     {
       "path": "src/client/app-changes-ui.mjs",
@@ -2110,7 +2267,7 @@
     },
     {
       "path": "src/client/app.mjs",
-      "sha256": "94b09545adfab24df9ac5d9af566ea43085abc79fd75c1c9f5e9397c3f3f027e"
+      "sha256": "1a107ca51b810a459c840db2deaa06425804baa6c06bc12d1097a9a4fa99365d"
     },
     {
       "path": "src/client/appearance-preview.mjs",
@@ -2126,7 +2283,7 @@
     },
     {
       "path": "src/client/canvas-ui.mjs",
-      "sha256": "541a850ed1ad3959dcc47e8a6fd8b5a36bd3ad0965248ea04f52c34470a44bb9"
+      "sha256": "da67756e0711e6ce4c75a3595e90f909e25e752d65277f1b5a67e2a2cfb7bb3c"
     },
     {
       "path": "src/client/chat-format.mjs",
@@ -2138,7 +2295,7 @@
     },
     {
       "path": "src/client/course-study-ui.mjs",
-      "sha256": "4e45ed1b0ea3b0f2e8f1b27a2fa28b79caecb6311b35bcf7cf7ab65fc732ad1a"
+      "sha256": "415df717539a58953f22757c60f80603dc94e490427a2f699a51d8e4d88597fa"
     },
     {
       "path": "src/client/customization-drawer.mjs",
@@ -2162,19 +2319,23 @@
     },
     {
       "path": "src/client/memory-ui.mjs",
-      "sha256": "c2fa599d6d6350aafc7847080f69a56033693c77592416a297658dafb9d9b78d"
+      "sha256": "8334954e58b0fd5a01db7d6cf628e4429b0a80d2a356877846a880b0b104afdd"
     },
     {
       "path": "src/client/pdf-workspace.mjs",
       "sha256": "c3f9521077f92d9103cede19b871b2c90f65b6dedf21fcdb699920c9a20cc478"
     },
     {
+      "path": "src/client/reading-library.mjs",
+      "sha256": "7224ffb6a8627791a0f7b5e0d97fe9603f7a79046365e72244fc72fc26fa8178"
+    },
+    {
       "path": "src/client/resources-ui.mjs",
-      "sha256": "311f45a14e2c9197ff267fd0b8181521b6f78e222b79142d1255874b397252a1"
+      "sha256": "2b630f09367824baee2c728e8ed3413b901493c1640ae5f105ac297f16829553"
     },
     {
       "path": "src/client/roger-navigation.mjs",
-      "sha256": "4c1d1b3ebbdd9d798daf4a479d736815287d3421d48cf5e2ddcfa85610729753"
+      "sha256": "88d51cd2f41799fb22a261a3b982c8f602aa53bb1f04b998c2f5ee34c589774e"
     },
     {
       "path": "src/client/roger-widget.mjs",
@@ -2185,8 +2346,12 @@
       "sha256": "d5753b86f6802110b0300c278e67c56ef93a2596b1767eb361a608192b34bcef"
     },
     {
+      "path": "src/client/student-tools.mjs",
+      "sha256": "3675bea8d9be90eeac0d19860ee730953ccc2ee576e8c41a10fd9db615071df6"
+    },
+    {
       "path": "src/client/study-ui.mjs",
-      "sha256": "974c776429b39a0162c3ad3000f106e214ffbb0eec9a5e182d403a5bb958e9d6"
+      "sha256": "817b9578e80e1725656bd65bd28db83fa033530af54cb1db7260220a2f45b392"
     },
     {
       "path": "src/client/submission-ui.mjs",
@@ -2210,7 +2375,7 @@
     },
     {
       "path": "src/python/canvas_records.py",
-      "sha256": "9d3f107db983d85abb2e1dbb003d0acfd8764bf0435195560b7664735bc0a2cf"
+      "sha256": "1ddae475c97aa91d009296350691f779214cef3655037cd90feb02068b888bc4"
     },
     {
       "path": "src/python/common.py",
@@ -2230,7 +2395,7 @@
     },
     {
       "path": "src/python/study_sets.py",
-      "sha256": "88b612c87eff6cadfbebd8f4db721884c3e60872729d93dbd1d00e1aa5f383ea"
+      "sha256": "48d1f36f66fa77b10e46693b8aa5ec46cb1c3f3314524df01ff4400e838b65d0"
     },
     {
       "path": "src/python/study.py",
@@ -2242,15 +2407,15 @@
     },
     {
       "path": "src/python/worker.py",
-      "sha256": "d50c71bf06d0d1df186b9e9cc70c426764f99203cf76a7c641e623c04b261137"
+      "sha256": "9323ef0c1ec5dbc8072e29d32dd1d2d1ab6f0f13b52e02f9c10cc9c8871fe344"
     },
     {
       "path": "src/server/app-changes.mjs",
-      "sha256": "d6b5cfab62ef7e2c519f72848ed8ed5d6e2cb4d919d67064fae510cc69f55b4b"
+      "sha256": "830f1deb9434efae01a88e51f6a6e2ab4d5736cc4d5ebfc2c143baaa18840744"
     },
     {
       "path": "src/server/app-preview.mjs",
-      "sha256": "02be0978365ae5a0edc78133203e5e93bce91c5fccc5831e71e2ae9d8a9193bd"
+      "sha256": "96094f5f3d280e6b7ef2eb489d7b7d3211c200aa9e989467852ef37c08b8c24a"
     },
     {
       "path": "src/server/app-recovery.mjs",
@@ -2266,11 +2431,11 @@
     },
     {
       "path": "src/server/canvas-download.mjs",
-      "sha256": "a287bfac45370006efa93376d31d6fc1989f9b06bfba1cbbe4a7dc2392b79839"
+      "sha256": "ca7bbf0fbbbf3755d6ea7d7beccd2fdee33c4d683ee1ed2e946472d04bbc6d44"
     },
     {
       "path": "src/server/canvas.mjs",
-      "sha256": "d56dbb20ac5febde355fd215eb138f72b4d728c9220468e016d9c6c6eee0cf05"
+      "sha256": "b719c26a760ea9ef842a5295184daea96fe326ba55288627e110b310ffdfd053"
     },
     {
       "path": "src/server/connections.mjs",
@@ -2278,7 +2443,11 @@
     },
     {
       "path": "src/server/course-export.mjs",
-      "sha256": "72994d6e7b372f546016f28d3b1700d0458cb09b8c7b44c64b47c369cbcc9b08"
+      "sha256": "f3a16496706a70bef17f61c2ecd1cff29641cc3cd9435365796547e8b735fd8c"
+    },
+    {
+      "path": "src/server/demo-answers.mjs",
+      "sha256": "39f33479f176b8f1df9d961613508d899abe6746d7712e7320df03947efbec09"
     },
     {
       "path": "src/server/document-processing.mjs",
@@ -2286,15 +2455,15 @@
     },
     {
       "path": "src/server/http.mjs",
-      "sha256": "d6d6ed89bd23363ee8b8ea16affdc4e6bd70b22cd47d4beeda3e9d927aa6d2cf"
+      "sha256": "f4084add7acd4bb1ac0e809be37606093d584d93867369d23508d76686bd66fb"
     },
     {
       "path": "src/server/index.mjs",
-      "sha256": "e894d25297062ff030ca697f6b8dfde086a8f7e580574affaa8cb50d1a225333"
+      "sha256": "9b796257feb5a30399d6b3fc8580f069cb4eccdd75adadd230630e7c705d0115"
     },
     {
       "path": "src/server/memory.mjs",
-      "sha256": "11f3ddafeaf39f55a6af53e6a1173c31250bb1966f259c17d48772d3558f2cb5"
+      "sha256": "f0bcd643f454e129d6cbdee333dc0ef921035fdb734f318cce28becfeb83e076"
     },
     {
       "path": "src/server/narration.mjs",
@@ -2306,7 +2475,7 @@
     },
     {
       "path": "src/server/python-domain.mjs",
-      "sha256": "985432f20fde8c9442963c980a299d762446efb63b96ac3dd64aff18a0678893"
+      "sha256": "3811a84704836a0f9d36b1e1c2aded44ac07222ed2b59b5b88852a00b6aab6e1"
     },
     {
       "path": "src/server/python-presentation.mjs",
@@ -2322,11 +2491,11 @@
     },
     {
       "path": "src/server/study.mjs",
-      "sha256": "5fa3c4646e3648d1f43a227ed88518b1d66fba16af7edc873a5e284adc2f79ac"
+      "sha256": "fd91bcea6a0883ed131b00770c4d1ff51f99d3dee27abf638b29f56373b612f0"
     },
     {
       "path": "src/server/submissions.mjs",
-      "sha256": "f708fdf746107c7f29ba3ea11efd4635c20fef1e1fb50574ac56bdca81a9344f"
+      "sha256": "137f699538dfc81d4dc0bcd62a72624f73f2ca92f7df9703377d0406dacd5586"
     },
     {
       "path": "src/server/web-resources.mjs",
@@ -2351,10 +2520,12 @@
     "src/client/loading-ui.mjs",
     "src/client/memory-ui.mjs",
     "src/client/pdf-workspace.mjs",
+    "src/client/reading-library.mjs",
     "src/client/resources-ui.mjs",
     "src/client/roger-navigation.mjs",
     "src/client/roger-widget.mjs",
     "src/client/speech.mjs",
+    "src/client/student-tools.mjs",
     "src/client/study-ui.mjs",
     "src/client/submission-ui.mjs",
     "src/client/syllabus-ui.mjs",
@@ -2379,6 +2550,7 @@
     "src/server/canvas.mjs",
     "src/server/connections.mjs",
     "src/server/course-export.mjs",
+    "src/server/demo-answers.mjs",
     "src/server/document-processing.mjs",
     "src/server/http.mjs",
     "src/server/index.mjs",
@@ -2578,6 +2750,20 @@
     },
     {
       "from": "src/client/app.mjs",
+      "to": "src/client/reading-library.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "/client/reading-library.mjs",
+          "line": 916,
+          "column": 46,
+          "syntax": "dynamic-import"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/app.mjs",
       "to": "src/client/resources-ui.mjs",
       "kind": "js-import",
       "locations": [
@@ -2628,6 +2814,20 @@
           "line": 4,
           "column": 1,
           "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/app.mjs",
+      "to": "src/client/student-tools.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "/client/student-tools.mjs",
+          "line": 930,
+          "column": 8,
+          "syntax": "dynamic-import"
         }
       ],
       "locationStatus": "located"
@@ -2751,6 +2951,20 @@
       "locations": [
         {
           "specifier": "/client/chat-format.mjs",
+          "line": 1,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/reading-library.mjs",
+      "to": "src/client/documents.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "/client/documents.mjs",
           "line": 1,
           "column": 1,
           "syntax": "ImportDeclaration"
@@ -2962,6 +3176,34 @@
       "locationStatus": "located"
     },
     {
+      "from": "src/server/app-preview.mjs",
+      "to": "src/server/demo-answers.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./demo-answers.mjs",
+          "line": 4,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/app-preview.mjs",
+      "to": "src/server/security.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./security.mjs",
+          "line": 5,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
       "from": "src/server/appearance-builder.mjs",
       "to": "src/server/security.mjs",
       "kind": "js-import",
@@ -3047,12 +3289,26 @@
     },
     {
       "from": "src/server/course-export.mjs",
+      "to": "src/server/canvas-download.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./canvas-download.mjs",
+          "line": 3,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/course-export.mjs",
       "to": "src/server/security.mjs",
       "kind": "js-import",
       "locations": [
         {
           "specifier": "./security.mjs",
-          "line": 2,
+          "line": 4,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3089,12 +3345,26 @@
     },
     {
       "from": "src/server/http.mjs",
+      "to": "src/server/app-preview.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./app-preview.mjs",
+          "line": 24,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/http.mjs",
       "to": "src/server/app-recovery.mjs",
       "kind": "js-import",
       "locations": [
         {
           "specifier": "./app-recovery.mjs",
-          "line": 24,
+          "line": 25,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3108,7 +3378,7 @@
       "locations": [
         {
           "specifier": "./appearance-builder.mjs",
-          "line": 25,
+          "line": 26,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3164,7 +3434,7 @@
       "locations": [
         {
           "specifier": "./course-export.mjs",
-          "line": 28,
+          "line": 29,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3192,7 +3462,7 @@
       "locations": [
         {
           "specifier": "./memory.mjs",
-          "line": 27,
+          "line": 28,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3290,7 +3560,7 @@
       "locations": [
         {
           "specifier": "./web-resources.mjs",
-          "line": 26,
+          "line": 27,
           "column": 1,
           "syntax": "ImportDeclaration"
         }

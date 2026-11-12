@@ -43,16 +43,6 @@
   margin: 1.8rem 0;
 }
 
-.resource-section-nav {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-block: 1rem 1.5rem;
-}
-.resource-section-nav [aria-pressed='true'] {
-  background: var(--wash);
-  border-color: var(--accent);
-}
 .research-directory h3 {
   margin-top: 1.6rem;
 }

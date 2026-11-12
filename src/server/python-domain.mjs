@@ -18,10 +18,18 @@ const limits = Object.freeze({
   'syllabus.docx': 3 * 1024 * 1024,
   'syllabus.excerpts': 1024 * 1024,
   ...Object.fromEntries(
-    ['profile', 'courses', 'course', 'assignment', 'assignments', 'page'].map((name) => [
-      'canvas.' + name,
-      8 * 1024 * 1024,
-    ]),
+    [
+      'profile',
+      'courses',
+      'course',
+      'assignment',
+      'assignments',
+      'page',
+      'groups',
+      'topics',
+      'topic',
+      'thread',
+    ].map((name) => ['canvas.' + name, 8 * 1024 * 1024]),
   ),
 });
 const codes = new Set([

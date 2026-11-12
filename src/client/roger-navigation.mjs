@@ -39,13 +39,20 @@ function score(query, item) {
 export function resolveNavigation(message, index, current = {}) {
   const query = normalized(message);
   const explicit = /\b(open|show|pull|take|go|bring)\b/.test(query);
-  const section = /\bsyllabus\b/.test(query)
-    ? 'syllabus'
-    : /\b(modules|materials|readings)\b/.test(query)
-      ? 'materials'
-      : /\bstudy\b/.test(query) && explicit
-        ? 'study'
-        : 'assignments';
+  const community = [
+    [/\bannouncements?\b/, 'announcements'],
+    [/\bgroups?\b/, 'groups'],
+    [/\bdiscussions?\b/, 'discussions'],
+  ].find(([words]) => words.test(query))?.[1];
+  const section =
+    community ||
+    (/\bsyllabus\b/.test(query)
+      ? 'syllabus'
+      : /\b(modules|materials|readings)\b/.test(query)
+        ? 'materials'
+        : /\bstudy\b/.test(query) && explicit
+          ? 'study'
+          : 'assignments');
   const courses = (index.courses || [])
     .map((item) => ({ ...item, score: score(query, item) }))
     .filter((item) => item.score)
@@ -80,7 +87,11 @@ export function resolveNavigation(message, index, current = {}) {
         .map((item) => ({ label: item.name, target: { courseId: item.id, section } })),
       explicit,
     };
-  if (explicit && /\b(this|that|current) (class|course)\b/.test(query) && current.courseId)
+  if (
+    explicit &&
+    current.courseId &&
+    (community || /\b(this|that|current) (class|course)\b/.test(query))
+  )
     return {
       target: { courseId: current.courseId, section },
       label: current.courseTitle,

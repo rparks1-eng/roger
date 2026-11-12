@@ -63,7 +63,13 @@ export function createCanvasPanel({
   let activeCourse = null;
   let activeAssignment = null;
   let activeAssignmentSource = null;
+  let activeCommunitySource = null;
   let activeTab = 'assignments';
+  const communitySections = new Map([
+    ['announcements', 'Announcements'],
+    ['discussions', 'Discussions'],
+    ['groups', 'Groups'],
+  ]);
   let semester = null;
   let assignments = null;
   let assignmentIssue = '';
@@ -811,7 +817,11 @@ export function createCanvasPanel({
     const exportControls = node('div', undefined, 'canvas-export-controls');
     const exportFormat = node('select');
     exportFormat.setAttribute('aria-label', 'Course snapshot format');
-    exportFormat.append(option('markdown', 'Readable notes'), option('json', 'Structured data'));
+    exportFormat.append(
+      option('markdown', 'Readable notes'),
+      option('json', 'Structured data'),
+      option('zip', 'ZIP with original files'),
+    );
     const exportButton = action(
       'Download course snapshot',
       async () => {
@@ -819,21 +829,27 @@ export function createCanvasPanel({
         const courseId = activeCourse.course.id;
         exportButton.disabled = true;
         exportFormat.disabled = true;
-        status('Preparing your course snapshot…');
+        const archived = exportFormat.value === 'zip';
+        status(archived ? 'Preparing your course archive…' : 'Preparing your course snapshot…');
         try {
           const result = await api(
             `/api/canvas/export?courseId=${encodeURIComponent(courseId)}&format=${exportFormat.value}`,
-            { signal: request.signal },
+            { signal: request.signal, binary: archived },
           );
           if (!request.valid() || !state.connected) return;
-          const url = URL.createObjectURL(new Blob([result.content], { type: result.mime }));
+          const { content, mime, fileName } = archived
+            ? { content: result.bytes, mime: result.mime, fileName: result.name }
+            : result;
+          const url = URL.createObjectURL(new Blob([content], { type: mime }));
           const link = node('a');
           link.href = url;
-          link.download = result.fileName;
+          link.download = fileName;
           link.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
           status(
-            'Course snapshot downloaded: assignments, modules, syllabus evidence and file links. Original files stay in Canvas.',
+            archived
+              ? 'Course archive downloaded. See course.json for included and unavailable files.'
+              : 'Course snapshot downloaded: assignments, modules, syllabus evidence and file links. Original files stay in Canvas.',
           );
         } catch (error) {
           if (request.valid())
@@ -846,7 +862,7 @@ export function createCanvasPanel({
       'button button-quiet',
     );
     exportControls.append(exportFormat, exportButton);
-    header.append(exportControls);
+    if (!state.recording) header.append(exportControls);
     const tabs = node('div', undefined, 'canvas-tabs');
     tabs.setAttribute('role', 'group');
     tabs.setAttribute('aria-label', 'Course sections');
@@ -855,6 +871,7 @@ export function createCanvasPanel({
       ['materials', 'Readings & modules', activeCourse.modules.length],
       ['study', 'Study', null],
       ['syllabus', 'Syllabus', null],
+      ...[...communitySections].map(([key, label]) => [key, label, null]),
     ]) {
       const button = action(
         count === null ? label : `${label} · ${count}`,
@@ -879,6 +896,10 @@ export function createCanvasPanel({
     noteCoverage(detail, activeCourse.coverage);
     const content = node('div', undefined, 'canvas-course-content');
     detail.append(content);
+    if (communitySections.has(activeTab)) {
+      void renderCommunity(content, activeCourse.course.id, activeTab);
+      return;
+    }
     if (activeTab === 'study') {
       const courseId = activeCourse.course.id;
       mountCourseStudy({
@@ -998,6 +1019,197 @@ export function createCanvasPanel({
       }
       if (!activeCourse.modules.length)
         content.append(node('p', 'No modules are available for this course.', 'canvas-empty'));
+    }
+  }
+  function communityRequest(endpoint, courseId, section, groupId, topicId) {
+    const query = new URLSearchParams({ courseId, section });
+    if (groupId) query.set('groupId', groupId);
+    if (topicId) query.set('topicId', topicId);
+    return `/api/canvas/${endpoint}?${query}`;
+  }
+  async function renderCommunity(content, courseId, section, groupId = null) {
+    const request = operation();
+    const label = communitySections.get(section);
+    content.replaceChildren(node('p', `Loading ${label.toLowerCase()}…`), skeleton('passage'));
+    try {
+      const result = await cachedRead(
+        communityRequest('community', courseId, section, groupId),
+        request.signal,
+      );
+      if (!request.valid() || !content.isConnected) return;
+      content.replaceChildren();
+      if (result.group) {
+        const group = result.group;
+        content.append(
+          action('← Groups', () => void renderCommunity(content, courseId, 'groups'), 'back-link'),
+          node('h3', group.name),
+        );
+        if (group.description) content.append(node('p', group.description, 'muted'));
+        if (group.url) content.append(external('Open group in Canvas ↗', group.url));
+        const sections = node('div', undefined, 'canvas-tabs');
+        sections.setAttribute('role', 'group');
+        sections.setAttribute('aria-label', 'Group sections');
+        for (const key of ['discussions', 'announcements']) {
+          const button = action(
+            communitySections.get(key),
+            () => void renderCommunity(content, courseId, key, group.id),
+            'canvas-tab',
+          );
+          button.setAttribute('aria-pressed', String(section === key));
+          sections.append(button);
+        }
+        content.append(sections);
+      } else content.append(node('h3', label));
+      noteCoverage(content, result.coverage);
+      const entries = result.groups || result.topics;
+      if (!entries.length) {
+        content.append(
+          node(
+            'p',
+            section === 'groups'
+              ? 'Canvas lists no groups you belong to for this course.'
+              : `No ${label.toLowerCase()} are available.`,
+            'canvas-empty',
+          ),
+        );
+        return;
+      }
+      const list = node('ul', undefined, 'canvas-community-list');
+      const back = () => void renderCommunity(content, courseId, section, groupId);
+      for (const entry of entries) {
+        const item = node('li');
+        const groupEntry = section === 'groups';
+        const select = groupEntry
+          ? () => void renderCommunity(content, courseId, 'discussions', entry.id)
+          : () => void openCommunityTopic(content, courseId, section, groupId, entry.id, back);
+        item.append(action(entry.name || entry.title, select, 'inline-link'));
+        const metadata = groupEntry
+          ? [
+              entry.memberCount == null
+                ? ''
+                : `${entry.memberCount} ${entry.memberCount === 1 ? 'member' : 'members'}`,
+            ]
+          : [entry.author, dateText(entry.postedAt, ''), entry.locked ? 'Locked' : ''];
+        if (metadata.some(Boolean))
+          item.append(node('p', metadata.filter(Boolean).join(' · '), 'muted'));
+        if (groupEntry && entry.description) item.append(node('p', entry.description));
+        list.append(item);
+      }
+      content.append(list);
+    } catch (error) {
+      if (!request.valid() || !content.isConnected) return;
+      content.replaceChildren(
+        node('h3', label),
+        node(
+          'p',
+          error.message || `Canvas could not load ${label.toLowerCase()}.`,
+          'canvas-notice',
+        ),
+        action('Try again', () => void renderCommunity(content, courseId, section, groupId)),
+      );
+      if (groupId)
+        content.append(
+          action('Back to groups', () => void renderCommunity(content, courseId, 'groups')),
+        );
+    }
+  }
+  function communityAttachments(target, attachments = []) {
+    if (!attachments.length) return;
+    const list = node('ul', undefined, 'canvas-community-attachments');
+    for (const file of attachments) {
+      const row = node('li');
+      row.append(external(`${file.name} ↗`, file.url));
+      list.append(row);
+    }
+    target.append(list);
+  }
+  async function openCommunityTopic(content, courseId, section, groupId, topicId, back) {
+    const request = operation();
+    const backButton = action(`← ${communitySections.get(section)}`, back, 'back-link');
+    content.replaceChildren(backButton, node('p', 'Opening topic…'), skeleton('passage'));
+    try {
+      const { topic, replies, groupTopic, replyIssue } = await api(
+        communityRequest('topic', courseId, section, groupId, topicId),
+        { signal: request.signal },
+      );
+      if (!request.valid() || !content.isConnected) return;
+      const article = node('article', undefined, 'canvas-community-topic');
+      article.append(node('h3', topic.title));
+      const metadata = [topic.author, dateText(topic.postedAt, '')].filter(Boolean);
+      if (metadata.length) article.append(node('p', metadata.join(' · '), 'muted'));
+      if (topic.url) article.append(external('Open original in Canvas ↗', topic.url));
+      content.replaceChildren(backButton, article);
+      if (topic.locked) {
+        article.append(
+          node('p', topic.lockExplanation || 'This topic is locked in Canvas.', 'canvas-notice'),
+        );
+        return;
+      }
+      const evidence = [];
+      const addBody = (target, html) => {
+        if (!html?.trim()) return;
+        const body = richInstructions(html, courseId);
+        evidence.push(body.textContent);
+        target.append(body);
+      };
+      addBody(article, topic.bodyHtml);
+      communityAttachments(article, topic.attachments);
+      if (topic.bodyTruncated || replyIssue)
+        article.append(
+          node(
+            'p',
+            [topic.bodyTruncated ? 'The post was shortened.' : '', replyIssue]
+              .filter(Boolean)
+              .join(' '),
+            'canvas-notice',
+          ),
+        );
+      if (groupTopic) {
+        article.append(
+          action(
+            `Open ${groupTopic.name} discussion`,
+            () =>
+              void openCommunityTopic(
+                content,
+                courseId,
+                section,
+                groupTopic.groupId,
+                groupTopic.topicId,
+                back,
+              ),
+          ),
+        );
+      }
+      const replyList = (entries) => {
+        const list = node('ol', undefined, 'canvas-community-replies');
+        for (const entry of entries) {
+          const item = node('li');
+          const detail = [
+            entry.deleted ? 'Deleted reply' : entry.author || 'Participant',
+            dateText(entry.postedAt, ''),
+          ].filter(Boolean);
+          item.append(node('p', detail.join(' · '), 'muted'));
+          addBody(item, entry.bodyHtml);
+          communityAttachments(item, entry.attachments);
+          if (entry.replies.length) item.append(replyList(entry.replies));
+          list.append(item);
+        }
+        return list;
+      };
+      if (replies.length) article.append(node('h4', 'Replies'), replyList(replies));
+      if (topic.url && evidence.length)
+        activeCommunitySource = {
+          element: article,
+          title: topic.title,
+          url: topic.url,
+          text: evidence.join('\n\n').slice(0, 8000),
+        };
+    } catch (error) {
+      if (request.valid() && content.isConnected)
+        content.replaceChildren(
+          backButton,
+          node('p', error.message || 'Canvas could not load this topic.', 'canvas-notice'),
+        );
     }
   }
   // Parse inside an inert template, then rebuild a small allowlist. Never insert Canvas HTML.
@@ -1432,6 +1644,10 @@ export function createCanvasPanel({
     if (!context.courseId) return [];
     const result = [];
     if (activeAssignment && activeAssignmentSource) result.push({ ...activeAssignmentSource });
+    if (activeCommunitySource?.element.isConnected) {
+      const { title, url, text } = activeCommunitySource;
+      result.push({ title, url, text });
+    }
     if (activeCourse && String(activeCourse.course.id) === String(context.courseId)) {
       result.push({
         title: `${context.courseTitle} · course assignments`,
@@ -1454,7 +1670,7 @@ export function createCanvasPanel({
     }
     return result;
   }
-  async function navigate({ courseId, assignmentId, section = 'assignments' }) {
+  async function navigate({ courseId, assignmentId, pageUrl, section = 'assignments' }) {
     if (!state.connected) throw new Error('Connect Canvas to open a class.');
     if (!semester) await loadCourses({ reuse: true });
     if (!semester?.courses.some((course) => String(course.id) === String(courseId)))
@@ -1464,13 +1680,17 @@ export function createCanvasPanel({
       if (!(await openAssignment(String(courseId), String(assignmentId))))
         throw new Error('The assignment could not be opened. Try again.');
     } else {
-      if (!['assignments', 'materials', 'study', 'syllabus'].includes(section))
-        throw new Error('Choose assignments, materials, study, or syllabus.');
+      if (
+        !['assignments', 'materials', 'study', 'syllabus'].includes(section) &&
+        !communitySections.has(section)
+      )
+        throw new Error('Choose a course section.');
       if (!(await loadCourse(String(courseId))))
         throw new Error('The course could not be opened. Try again.');
       if (activeCourse && String(activeCourse.course.id) === String(courseId)) {
-        activeTab = section;
+        activeTab = pageUrl ? 'materials' : section;
         renderCourse();
+        if (pageUrl) await openPage(String(courseId), pageUrl);
       }
     }
     return getContext();

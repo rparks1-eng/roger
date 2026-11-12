@@ -2,7 +2,42 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { answerStudy, providerStatus, STUDY_BINDING, STUDY_LIMITS } from '../src/server/study.mjs';
+import {
+  answerStudy,
+  createStudySet,
+  providerStatus,
+  STUDY_BINDING,
+  STUDY_LIMITS,
+} from '../src/server/study.mjs';
+
+test('discussion and worksheets use cited local passages even if a model is requested', async () => {
+  const sources = [
+    { id: 'lesson', kind: 'material', text: 'The example compares a 20% share and a 30% share.' },
+  ];
+  let providerCalls = 0;
+  const fetcher = async () => {
+    providerCalls++;
+    throw new Error('No provider should be called');
+  };
+  const worksheet = await createStudySet(
+    { mode: 'worksheet', engine: 'local', sources },
+    undefined,
+    { fetcher },
+  );
+  assert.deepEqual(
+    worksheet.worksheet.rows.map(({ value }) => value),
+    [20, 30],
+  );
+  const discussion = await createStudySet(
+    { mode: 'discussion', engine: 'local', sources },
+    undefined,
+    { fetcher },
+  );
+  assert.equal(discussion.cards[0].sourceId, 'lesson');
+  assert.equal(discussion.cards[0].quote, sources[0].text);
+  assert.equal(discussion.fallback, false);
+  assert.equal(providerCalls, 0);
+});
 import { retrieveSources } from '../src/server/retrieval.mjs';
 import { pythonDomain } from '../src/server/python-domain.mjs';
 import { codexStudyArgs, createStudyEventReader } from '../src/core/cli-protocol.ts';

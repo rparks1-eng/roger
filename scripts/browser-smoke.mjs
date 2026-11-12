@@ -2,7 +2,7 @@
 // QA dependency is external to the runtime app; no install or real provider call.
 import { browserOptions } from './quality/scratch.mjs';
 import { createRequire } from 'node:module';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 const require = createRequire(import.meta.url);
@@ -189,12 +189,33 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   checks++;
   await page.screenshot({ path: path.join(output, 'reader-mobile.png'), fullPage: true });
+  await page.locator('#page-next').click();
+  await page.locator('#page-indicator').filter({ hasText: '2 of 2' }).waitFor();
   await page.locator('#back-library').click();
   await page.screenshot({ path: path.join(output, 'library-mobile.png'), fullPage: true });
   await page.reload();
   await page.locator('.primary-nav [data-view=library]').click();
-  await page.locator('#library-empty').waitFor();
-  assert.equal(await page.locator('.reading-card').count(), 0);
+  const restored = page.locator('.reading-card').filter({ hasText: 'Source fixture.pdf' });
+  const [original] = await Promise.all([
+    page.waitForEvent('download'),
+    restored.getByRole('button', { name: 'Download original' }).click(),
+  ]);
+  assert.deepEqual(await readFile(await original.path()), pdf);
+  await restored.getByRole('button', { name: 'Open', exact: true }).click();
+  await page.locator('#page-indicator').filter({ hasText: '2 of 2' }).waitFor();
+  assert.ok((await page.locator('#notes-input').inputValue()).includes(selected));
+  await page.locator('#highlights-list').getByRole('button', { name: 'Page 1' }).click();
+  await page.locator('#pdf-workspace .pdf-highlight').waitFor();
+  checks++;
+  await page.locator('#back-library').click();
+  const folder = path.join(output, 'reader-folder');
+  await mkdir(folder, { recursive: true });
+  await writeFile(path.join(folder, 'Reading from folder.md'), 'A deliberately selected document.');
+  await writeFile(path.join(folder, 'Unrelated.bin'), 'An unsupported file must not be imported.');
+  await page.locator('#folder-input').setInputFiles(folder);
+  await page.locator('#app-status').filter({ hasText: 'Added 1 of 2 selected files.' }).waitFor();
+  assert.equal(await page.locator('.reading-card').count(), 3);
+  assert.equal(await page.getByText('Unrelated.bin').count(), 0);
   checks++;
   // Canvas UI is exercised with fixtures, never a real token or account.
   await page.route('**/api/canvas/connect', (route) =>
@@ -414,6 +435,12 @@ try {
   await page.locator('#canvas-disconnect').click();
   await page.locator('#canvas-status').filter({ hasText: 'Not connected' }).waitFor();
   assert.equal(await page.locator('#course-list').textContent(), '');
+  await page.locator('.primary-nav [data-view=library]').click();
+  assert.equal(
+    await page.locator('.reading-card').filter({ hasText: 'Course fixture.txt' }).count(),
+    0,
+  );
+  assert.equal(await page.locator('.reading-card').count(), 3);
   checks++;
   assert.deepEqual(errors, []);
   checks++;

@@ -12,6 +12,8 @@ import {
   getCanvasReading,
   readCanvasAssignment,
   readCanvasPage,
+  listCanvasCommunity,
+  readCanvasCommunityTopic,
 } from '../src/server/canvas.mjs';
 const token = 'synthetic-token-not-real';
 const json = (value, headers = {}) =>
@@ -499,4 +501,146 @@ test('HTML downloads are available only as study inputs, not ordinary active rea
   metadata['content-type'] = 'application/javascript';
   await assert.rejects(getCanvasStudyFile(token, 4, 7, { fetcher }), { code: 'unsupported_type' });
   assert.equal(downloads, 1);
+});
+
+test('announcements retain visible titles, topic authors, and canonical attachments', async () => {
+  const topic = {
+    id: 12,
+    title: '<b>Course briefing</b>',
+    message: '<p>Bring your notes.</p>',
+    posted_at: '2026-11-11T15:00:00Z',
+    author: { display_name: 'Fixture instructor' },
+    is_announcement: true,
+    locked_for_user: true,
+    lock_info: { can_view: true },
+    attachments: [
+      { url: '/courses/4/files/6/download?verifier=secret', filename: 'Brief.pdf' },
+      { url: '/courses/99/files/6/download', filename: 'Wrong course' },
+    ],
+  };
+  const fetcher = async (href, options) => {
+    const url = new URL(href);
+    assert.equal(options.method, 'GET');
+    if (url.pathname === '/api/v1/courses/4/discussion_topics') {
+      assert.equal(url.searchParams.get('only_announcements'), 'true');
+      return json([
+        topic,
+        { ...topic, id: 13, context_code: 'course_8' },
+        { ...topic, id: 14, published: false },
+      ]);
+    }
+    if (url.pathname.endsWith('/12')) return json(topic);
+    assert.equal(url.pathname, '/api/v1/courses/4/discussion_topics/12/view');
+    return json({ view: [] });
+  };
+  const list = await listCanvasCommunity(token, 4, { section: 'announcements' }, { fetcher });
+  assert.deepEqual(
+    list.topics.map(({ title }) => title),
+    ['Course briefing'],
+  );
+  assert.equal(list.topics[0].bodyHtml, undefined);
+  const { topic: detail } = await readCanvasCommunityTopic(
+    token,
+    4,
+    12,
+    { section: 'announcements' },
+    { fetcher },
+  );
+  assert.equal(detail.author, 'Fixture instructor');
+  assert.equal(detail.bodyHtml, '<p>Bring your notes.</p>');
+  assert.deepEqual(detail.attachments, [
+    { name: 'Brief.pdf', url: `${CANVAS_ORIGIN}/courses/4/files/6` },
+  ]);
+});
+
+test('group replies require a verified course membership and preserve nested/new entries', async () => {
+  const calls = [];
+  const fetcher = async (href) => {
+    const url = new URL(href);
+    calls.push(url.pathname);
+    if (url.pathname === '/api/v1/courses/4/groups') {
+      assert.equal(url.searchParams.get('only_own_groups'), 'true');
+      return json([
+        { id: 20, name: 'Own group', context_type: 'Course', course_id: 4 },
+        { id: 30, name: 'Different class', context_type: 'Course', course_id: 8 },
+      ]);
+    }
+    if (url.pathname === '/api/v1/courses/4/discussion_topics/12')
+      return json({
+        id: 12,
+        title: 'Group prompt',
+        group_category_id: 2,
+        group_topic_children: [
+          { id: 9, group_id: 20 },
+          { id: 2, group_id: 30 },
+        ],
+      });
+    if (url.pathname === '/api/v1/groups/20/discussion_topics/9')
+      return json({ id: 9, title: 'Our discussion' });
+    assert.equal(url.pathname, '/api/v1/groups/20/discussion_topics/9/view');
+    assert.equal(url.searchParams.get('include_new_entries'), '1');
+    return json({
+      participants: [
+        { id: 1, display_name: 'Fixture student', avatar_url: 'https://do-not-send.invalid' },
+      ],
+      view: [
+        {
+          id: 1,
+          user_id: 1,
+          message: '<p>First reply</p>',
+          replies: [{ id: 2, deleted: true, message: '<p>Hidden content</p>' }],
+        },
+      ],
+      new_entries: [{ id: 3, parent_id: 2, message: '<p>New child reply</p>' }],
+    });
+  };
+  const { topic, groupTopic } = await readCanvasCommunityTopic(
+    token,
+    4,
+    12,
+    { section: 'discussions' },
+    { fetcher },
+  );
+  assert.equal(topic.groupChildren, undefined);
+  assert.deepEqual(groupTopic, { groupId: '20', topicId: '9', name: 'Own group' });
+  await assert.rejects(
+    readCanvasCommunityTopic(token, 4, 2, { section: 'discussions', groupId: 30 }, { fetcher }),
+    { code: 'unavailable', status: 403 },
+  );
+  assert.ok(!calls.some((path) => path.startsWith('/api/v1/groups/30')));
+  const { replies, replyIssue } = await readCanvasCommunityTopic(
+    token,
+    4,
+    9,
+    { section: 'discussions', groupId: 20 },
+    { fetcher },
+  );
+  assert.equal(replyIssue, null);
+  assert.equal(replies[0].author, 'Fixture student');
+  assert.equal(replies[0].replies[0].bodyHtml, '');
+  assert.equal(replies[0].replies[0].replies[0].bodyHtml, '<p>New child reply</p>');
+  assert.doesNotMatch(JSON.stringify(replies), /Hidden content|do-not-send/);
+});
+
+test('locked posts and initial-post requirements do not fetch protected replies', async () => {
+  for (const fields of [
+    { locked_for_user: true },
+    { user_can_see_posts: false, require_initial_post: true },
+  ]) {
+    const result = await readCanvasCommunityTopic(
+      token,
+      4,
+      12,
+      { section: 'discussions' },
+      {
+        fetcher: async (href) => {
+          assert.equal(new URL(href).pathname, '/api/v1/courses/4/discussion_topics/12');
+          return json({ id: 12, title: 'Topic', message: '<p>Prompt</p>', ...fields });
+        },
+      },
+    );
+    assert.deepEqual(result.replies, []);
+    if (fields.locked_for_user) assert.equal(result.topic.bodyHtml, '');
+    else assert.match(result.replyIssue, /initial post/);
+  }
 });

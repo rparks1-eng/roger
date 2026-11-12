@@ -16,6 +16,9 @@ export async function initialize() {
   session = await result.json();
   return session;
 }
+export function isPreviewSession() {
+  return session?.preview === true;
+}
 export function api(url, options = {}) {
   // These bounded local reads have a separate server admission lane. A model
   // response or optional account check must not block opening saved work.

@@ -94,7 +94,12 @@ test('owner bootstrap exposes only profile and csrf, never the token, and serves
   const session = JSON.parse(text);
   assert.deepEqual(session.canvas, profile);
   assert.equal(typeof session.csrf, 'string');
-  assert.deepEqual(Object.keys(session).sort(), ['canvas', 'csrf', 'ephemeral']);
+  assert.deepEqual(Object.keys(session).sort(), [
+    'canvas',
+    'csrf',
+    'ephemeral',
+    'recordingAvailable',
+  ]);
   const courses = await app.send('/api/canvas/courses');
   assert.equal(courses.status, 200);
   assert.equal((await courses.text()).includes(token), false);

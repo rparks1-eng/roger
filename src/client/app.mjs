@@ -1,4 +1,4 @@
-import { initialize, api, uploadDocument } from '/client/api.mjs';
+import { initialize, api, isPreviewSession, uploadDocument } from '/client/api.mjs';
 import { mountPDFWorkspace } from '/client/pdf-workspace.mjs';
 import { readDocument, disposeDocuments, DOCUMENT_LIMITS } from '/client/documents.mjs';
 import {
@@ -22,7 +22,7 @@ import { createAppearancePreview, isAppearanceRequest } from '/client/appearance
 import { renderChatText } from '/client/chat-format.mjs';
 import { createMemoryUI } from '/client/memory-ui.mjs';
 import { resolveNavigation } from '/client/roger-navigation.mjs';
-import { createResourcesUI } from '/client/resources-ui.mjs';
+import { createResourcesUI, renderNewsDirectory } from '/client/resources-ui.mjs';
 import { createHomeworkPlanner } from '/client/homework-planner.mjs';
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -30,6 +30,7 @@ const state = {
   current: null,
   page: 0,
   connected: false,
+  recording: false,
   question: null,
   generation: 0,
   importing: false,
@@ -41,7 +42,10 @@ let pdfWorkspace = null,
   pdfSelection = null,
   ocrController = null,
   originalMode = true,
-  ocrAvailable = true;
+  ocrAvailable = true,
+  readingLibrary,
+  readingReady,
+  folderImport;
 const node = (tag, text, className) => {
   const item = document.createElement(tag);
   if (text !== undefined) item.textContent = text;
@@ -76,6 +80,19 @@ const canvasPanel = createCanvasPanel({
   status,
   onConnectionChange: (connected) => {
     $('canvas-setup').hidden = connected;
+    if (!connected) {
+      const transient = state.documents.filter((doc) => doc.canvasReading);
+      if (transient.length) {
+        if (state.current?.canvasReading) {
+          closePDF();
+          state.current = null;
+          if (!$('reader-view').hidden) view('library');
+        }
+        disposeDocuments(transient);
+        state.documents = state.documents.filter((doc) => !doc.canvasReading);
+        renderLibrary();
+      }
+    }
   },
   onConnect: () => {
     if (!$('settings-view').hidden) view('courses');
@@ -155,7 +172,11 @@ const appearanceUI = createAppearancePreview({
     view('connections');
   },
 });
-const resourcesUI = createResourcesUI({ container: $('resources-content'), api });
+const resourcesUI = createResourcesUI({
+  container: $('resources-content'),
+  api,
+  isRecording: () => state.recording,
+});
 const customizationDrawer = createCustomizationDrawer({
   dialog: $('customize-drawer'),
   trigger: $('customize-toggle'),
@@ -174,6 +195,15 @@ const memoryUI = createMemoryUI({
   api,
   getContext: () => canvasPanel.getContext(),
   onResume: async (thread) => {
+    if (thread.documentId) {
+      await readingReady;
+      if (!state.documents.some((doc) => doc.id === thread.documentId && !doc.canvasReading))
+        throw new Error('Open the original file in Readings to resume this conversation.');
+      openDocument(thread.documentId);
+      $('question-input').focus();
+      status(`Resumed: ${thread.title}. Ask your next question about this reading.`);
+      return;
+    }
     if (thread.courseId) {
       view('courses');
       await canvasPanel.navigate({
@@ -184,15 +214,37 @@ const memoryUI = createMemoryUI({
     $('roger-launch').click();
     $('roger-widget-response').textContent = `Resumed: ${thread.title}. Ask your next question.`;
   },
+  onOpenCitation: async (citation) => {
+    await readingReady;
+    const doc = state.documents.find(
+      (item) => item.id === citation.documentId && !item.canvasReading,
+    );
+    if (!doc) throw new Error('Open the original file in Readings to follow this citation.');
+    const page = doc.pages.find((item) => item.page === citation.page);
+    if (
+      !page ||
+      doc.revision !== citation.revision ||
+      !doc.text.slice(page.start, page.end).includes(citation.quote)
+    )
+      throw new Error('This citation was saved from a different reading revision.');
+    openDocument(doc.id, page.page);
+  },
 });
-async function rememberExchange(message, reply, scope = conversationContext()) {
+async function rememberExchange(
+  message,
+  reply,
+  scope = conversationContext(),
+  { citations, signal } = {},
+) {
+  if (isPreviewSession()) return;
   try {
     const result = await api('/api/memory/record', {
-      body: { ...scope, threadId: memoryUI.activeThread(scope), message, reply },
+      body: { ...scope, threadId: memoryUI.activeThread(scope), message, reply, citations },
+      signal,
     });
-    memoryUI.setThread(scope, result.threadId);
+    if (result.threadId) memoryUI.setThread(scope, result.threadId);
   } catch (error) {
-    status(`Conversation was not saved: ${error.message}`);
+    if (!signal?.aborted) status(`Conversation was not saved: ${error.message}`);
   }
 }
 function stop() {
@@ -201,7 +253,7 @@ function stop() {
   $('pause-button').textContent = 'Pause';
 }
 let navigationTouched = false;
-function view(name, { automatic = false, load = true, overview = false } = {}) {
+function view(name, { automatic = false, load = true, overview = false, keepAnswer = false } = {}) {
   if (name === 'customize') {
     customizationDrawer.open();
     return;
@@ -209,7 +261,7 @@ function view(name, { automatic = false, load = true, overview = false } = {}) {
   if (!automatic) navigationTouched = true;
   if (compactNav.matches) $('rail-more').open = false;
   stop();
-  resetQuestionContext();
+  if (!keepAnswer) resetQuestionContext();
   if (name !== 'builder') builderUI.leave();
   if (name !== 'app-changes') appChangesUI.leave();
   if (name !== 'reader') {
@@ -226,6 +278,8 @@ function view(name, { automatic = false, load = true, overview = false } = {}) {
     'app-changes',
     'connections',
     'resources',
+    'research',
+    'tools',
     'memory',
   ])
     $(`${candidate}-view`).hidden = candidate !== name;
@@ -243,6 +297,7 @@ function view(name, { automatic = false, load = true, overview = false } = {}) {
   }
   if (name === 'planner') homeworkPlanner.render();
   if (name === 'resources') resourcesUI.render();
+  if (name === 'research') renderNewsDirectory($('research-content'));
   if (name === 'memory') return memoryUI.render();
   if (name === 'builder') void builderUI.render();
   if (name === 'app-changes') void appChangesUI.render();
@@ -261,7 +316,7 @@ function renderLibrary() {
       node('h3', doc.title),
       node(
         'p',
-        `${doc.pages.length} ${doc.isPdf ? (doc.pages.length === 1 ? 'page' : 'pages') : doc.pages.length === 1 ? 'section' : 'sections'} · ${doc.text.trim() ? 'Ready to read' : 'No extracted text'}`,
+        `${doc.pages.length} ${doc.isPdf ? (doc.pages.length === 1 ? 'page' : 'pages') : doc.pages.length === 1 ? 'section' : 'sections'} · ${doc.saved ? 'Saved in this browser' : 'This session'}`,
       ),
     );
     const actions = node('div', undefined, 'reading-actions');
@@ -269,12 +324,20 @@ function renderLibrary() {
     open.addEventListener('click', () => openDocument(doc.id));
     const remove = node('button', 'Remove', 'button button-quiet');
     remove.setAttribute('aria-label', `Remove ${doc.title}`);
-    remove.addEventListener('click', () => {
+    remove.addEventListener('click', async () => {
       if (
-        doc.notes &&
-        !window.confirm('Download your notes before removing this reading. Remove it anyway?')
+        (doc.notes || doc.annotations?.length) &&
+        !window.confirm('Remove this reading and its notes and highlights from Roger?')
       )
         return;
+      remove.disabled = true;
+      try {
+        if (doc.saved) await readingLibrary.remove(doc.id);
+      } catch {
+        status('Could not remove the saved reading. Try again.');
+        remove.disabled = false;
+        return;
+      }
       resetQuestionContext();
       if (state.current?.id === doc.id) {
         stop();
@@ -284,12 +347,42 @@ function renderLibrary() {
       state.documents = state.documents.filter((item) => item.id !== doc.id);
       renderLibrary();
     });
-    actions.append(open, remove);
+    actions.append(open);
+    if (doc.saved) {
+      const downloadOriginal = node('button', 'Download original', 'button button-quiet');
+      downloadOriginal.addEventListener('click', async () => {
+        try {
+          const file = await readingLibrary.original(doc.id);
+          if (!file) throw new Error('Reading removed');
+          download(file, file.name);
+        } catch {
+          status('The original is no longer available in this browser.');
+        }
+      });
+      actions.append(downloadOriginal);
+    }
+    actions.append(remove);
     card.append(icon, body, actions);
     $('library-list').append(card);
   }
   if (state.documents.length && !shown.length)
     $('library-list').append(node('p', 'No readings match that name.'));
+}
+function updateReading(doc, patch) {
+  if (!doc.saved) return;
+  const editingNotes = typeof patch.notes === 'string';
+  if (editingNotes) $('notes-status').textContent = 'Saving…';
+  void readingLibrary.update(doc.id, patch).then(
+    () => {
+      if (editingNotes && state.current === doc && doc.notes === patch.notes)
+        $('notes-status').textContent = 'Saved in this browser';
+    },
+    () => {
+      if (editingNotes && state.current === doc && doc.notes === patch.notes)
+        $('notes-status').textContent = 'Could not save · download your notes';
+      else status('Could not save the latest reading changes in this browser.');
+    },
+  );
 }
 function closePDF() {
   pdfController?.abort();
@@ -315,8 +408,12 @@ function renderHighlights() {
     });
     const remove = node('button', 'Remove', 'button button-quiet');
     remove.addEventListener('click', () => {
-      pdfWorkspace?.removeAnnotation(mark.id);
+      if (pdfWorkspace) {
+        pdfWorkspace.removeAnnotation(mark.id);
+        return;
+      }
       doc.annotations = doc.annotations.filter((item) => item.id !== mark.id);
+      updateReading(doc, { annotations: doc.annotations });
       renderHighlights();
     });
     item.append(jump, node('blockquote', mark.quote), remove);
@@ -354,6 +451,7 @@ async function showOriginal() {
       },
       onAnnotationsChange: (items) => {
         doc.annotations = items;
+        updateReading(doc, { annotations: items });
         if (state.current === doc) renderHighlights();
       },
     });
@@ -371,19 +469,21 @@ async function showOriginal() {
     }
   }
 }
-function openDocument(id, pageNumber = 1) {
+function openDocument(id, pageNumber) {
   const doc = state.documents.find((item) => item.id === id);
   if (!doc) return;
   if (state.current !== doc) closePDF();
   ocrController?.abort();
   state.current = doc;
-  state.page = Math.max(0, Math.min(doc.pages.length - 1, pageNumber - 1));
+  state.page = Math.max(0, Math.min(doc.pages.length - 1, (pageNumber ?? doc.lastPage ?? 1) - 1));
   originalMode = Boolean(doc.isPdf);
   view('reader');
   $('notes-input').value = doc.notes;
   $('answer-output').replaceChildren();
   $('sources-list').replaceChildren();
-  $('notes-status').textContent = 'Session only · download to keep';
+  $('notes-status').textContent = doc.saved
+    ? 'Saved in this browser'
+    : 'Session only · download to keep';
   renderPage();
 }
 function renderPage() {
@@ -392,6 +492,10 @@ function renderPage() {
   const doc = state.current;
   if (!doc) return;
   const page = doc.pages[state.page];
+  if (doc.lastPage !== state.page + 1) {
+    doc.lastPage = state.page + 1;
+    updateReading(doc, { lastPage: doc.lastPage });
+  }
   ocrController?.abort();
   pdfSelection = null;
   selectionControls(false);
@@ -440,7 +544,10 @@ async function textDigest(text) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return Array.from(new Uint8Array(bytes), (n) => n.toString(16).padStart(2, '0')).join('');
 }
-async function importFile(file, { signal, initialPage = 1, source, ocr = [] } = {}) {
+async function importFile(
+  file,
+  { signal, initialPage, source, ocr = [], open = true, saveLocally = false } = {},
+) {
   if (state.importing) return;
   state.importing = true;
   const controller = new AbortController();
@@ -451,8 +558,7 @@ async function importFile(file, { signal, initialPage = 1, source, ocr = [] } = 
   if (signal?.aborted) controller.abort();
   else signal?.addEventListener('abort', abortImport, { once: true });
   try {
-    if (state.documents.length >= DOCUMENT_LIMITS.files)
-      throw new Error('This session holds eight readings. Remove one before adding another.');
+    await readingReady;
     let doc;
     if (/\.pptx$/i.test(file.name)) {
       if (file.size > DOCUMENT_LIMITS.bytes) throw new Error('Choose a presentation under 12 MB.');
@@ -503,27 +609,45 @@ async function importFile(file, { signal, initialPage = 1, source, ocr = [] } = 
     const existing = state.documents.find((item) => item.id === doc.id);
     if (existing) {
       disposeDocuments([doc]);
-      openDocument(existing.id, initialPage);
+      if (open) openDocument(existing.id, initialPage);
       status('Opened the existing reading.');
       return;
+    }
+    if (state.documents.length >= DOCUMENT_LIMITS.files) {
+      disposeDocuments([doc]);
+      throw new Error('The library holds eight open readings. Remove one before adding another.');
     }
     if (
       state.documents.reduce((sum, item) => sum + item.text.length, 0) + doc.text.length >
       480_000
     ) {
       disposeDocuments([doc]);
-      throw new Error('The reading library is full for this session. Remove a document first.');
+      throw new Error('The reading library is full. Remove a document first.');
+    }
+    doc.canvasReading = !saveLocally;
+    if (saveLocally && readingLibrary) {
+      try {
+        await readingLibrary.save(doc, file);
+        doc.saved = true;
+      } catch {
+        doc.saveFailed = true;
+      }
     }
     state.documents.push(doc);
     renderLibrary();
-    openDocument(doc.id, initialPage);
+    if (open) openDocument(doc.id, initialPage);
     status(
-      doc.kind === 'pptx'
-        ? 'PowerPoint slide text opened. Original layout and images are not included.'
-        : doc.text.trim()
-          ? 'Document opened. Nothing was uploaded to an AI service.'
-          : 'Original scan opened. Use OCR page to read its text locally.',
+      doc.saveFailed
+        ? 'Reading opened for this session. This browser could not save it.'
+        : doc.saved
+          ? 'Reading saved in this browser.'
+          : doc.kind === 'pptx'
+            ? 'PowerPoint slide text opened. Original layout and images are not included.'
+            : doc.text.trim()
+              ? 'Document opened. Nothing was uploaded to an AI service.'
+              : 'Original scan opened. Use OCR page to read its text locally.',
     );
+    return true;
   } catch (error) {
     status(
       controller.signal.aborted
@@ -538,12 +662,13 @@ async function importFile(file, { signal, initialPage = 1, source, ocr = [] } = 
     $('upload-input').value = '';
   }
 }
-function renderEvidence(passages, target = $('sources-list')) {
+function renderEvidence(passages, target = $('sources-list'), openSource) {
   target.replaceChildren();
   if (!passages.length) return;
   const details = node('details');
+  details.open = Boolean(openSource);
   details.append(node('summary', 'Source text used for this question'));
-  for (const passage of passages) {
+  for (const [index, passage] of passages.entries()) {
     const article = node('article');
     const doc = state.documents.find((item) => item.id === passage.documentId);
     const location =
@@ -554,7 +679,9 @@ function renderEvidence(passages, target = $('sources-list')) {
           : `characters ${passage.start + 1}–${passage.end}`;
     const button = node(
       passage.sourceUrl ? 'a' : 'button',
-      `${passage.title} · ${location}`,
+      openSource
+        ? `[${index + 1}] ${passage.title} · ${passage.section}`
+        : `${passage.title} · ${location}`,
       'inline-link',
     );
     if (passage.sourceUrl) {
@@ -563,6 +690,7 @@ function renderEvidence(passages, target = $('sources-list')) {
       button.rel = 'noopener noreferrer';
     } else button.type = 'button';
     button.addEventListener('click', () => {
+      if (openSource) return void openSource(passage.destination);
       if (passage.sourceUrl) return;
       const index = doc?.pages.findIndex(
         (page) => passage.start >= page.start && passage.start < page.end,
@@ -581,6 +709,40 @@ function renderEvidence(passages, target = $('sources-list')) {
     details.append(article);
   }
   target.append(details);
+}
+async function askDemo(message, widget, response) {
+  if (state.question) return;
+  const controller = new AbortController();
+  state.question = controller;
+  const generation = ++state.generation;
+  const sources = $('roger-widget-sources');
+  const send = $('roger-send');
+  send.disabled = true;
+  widget.dataset.state = 'thinking';
+  response.textContent = 'Looking through demo materials…';
+  sources.replaceChildren();
+  try {
+    const result = await api('/api/demo/ask', {
+      body: { ...conversationContext(), message },
+      signal: controller.signal,
+    });
+    if (generation !== state.generation) return;
+    renderChatText(response, result.text);
+    renderEvidence(result.passages, sources, async (destination) => {
+      try {
+        if ($('courses-view').hidden) view('courses', { load: false, keepAnswer: true });
+        await canvasPanel.navigate(destination);
+      } catch (error) {
+        status(error.message);
+      }
+    });
+  } catch (error) {
+    if (generation === state.generation) response.textContent = error.message;
+  } finally {
+    if (state.question === controller) state.question = null;
+    send.disabled = false;
+    widget.dataset.state = 'idle';
+  }
 }
 async function ask(event, context = {}) {
   event.preventDefault();
@@ -605,11 +767,12 @@ async function ask(event, context = {}) {
   if ($('cancel-question')) $('cancel-question').hidden = false;
   try {
     const page = doc.pages[doc.id === state.current?.id ? state.page : 0];
+    const questionScope = context.scope || $('question-scope')?.value;
     let passages;
-    if (['library', 'document'].includes(context.scope || $('question-scope')?.value)) {
+    if (['library', 'document'].includes(questionScope)) {
       const result = await api('/api/retrieval', {
         body: {
-          documents: (context.scope === 'document' ? [doc] : state.documents).map((item) => ({
+          documents: (questionScope === 'document' ? [doc] : state.documents).map((item) => ({
             id: item.id,
             revision: item.revision,
             title: item.title,
@@ -687,6 +850,43 @@ async function ask(event, context = {}) {
       output.append(node('blockquote', quote.quote), node('p', quote.note));
     output.append(node('p', result.question));
     notify('Answer ready. Check it against the source text.');
+    const local = new Map(
+      state.documents.filter((item) => !item.canvasReading).map((item) => [item.id, item]),
+    );
+    const localSources = passages.every((passage) => local.has(passage.documentId));
+    if (!doc.canvasReading && localSources) {
+      const cited = new Map();
+      for (const { quote } of result.passages) {
+        const matches = passages.filter((passage) => passage.text.includes(quote));
+        if (matches.length === 1) cited.set(matches[0], quote);
+      }
+      const evidence = cited.size
+        ? [...cited]
+        : passages.slice(0, 4).map((passage) => [passage, passage.text.slice(0, 1000)]);
+      await rememberExchange(
+        message,
+        [
+          result.reply,
+          ...result.passages.flatMap(({ quote, note }) => [quote, note]),
+          result.question,
+        ].join('\n\n'),
+        { documentId: doc.id },
+        {
+          signal: controller.signal,
+          citations: evidence.map(([passage, quote]) => {
+            const source = local.get(passage.documentId);
+            return {
+              documentId: passage.documentId,
+              revision: passage.revision,
+              title: passage.title.slice(0, 300),
+              page: passage.page,
+              location: source.isPdf ? 'page' : source.kind === 'pptx' ? 'slide' : 'section',
+              quote,
+            };
+          }),
+        },
+      );
+    }
   } catch (error) {
     if (generation === state.generation) {
       output.replaceChildren();
@@ -708,7 +908,38 @@ function updateTodayDate() {
   });
 }
 async function start() {
+  const sessionRequest = initialize();
+  readingReady = sessionRequest.then(
+    async (session) => {
+      if (session.preview) return;
+      try {
+        const { openReadingLibrary } = await import('/client/reading-library.mjs');
+        readingLibrary = await openReadingLibrary();
+        state.documents = await readingLibrary.load();
+        renderLibrary();
+      } catch {
+        readingLibrary = undefined;
+        $('library-storage-status').textContent =
+          'Saved readings are unavailable. Opened files will stay in this session.';
+      }
+      $('folder-button').hidden = !('webkitdirectory' in $('folder-input'));
+    },
+    () => {},
+  );
   updateTodayDate();
+  void import('/client/student-tools.mjs')
+    .then(({ mountStudentTools }) =>
+      mountStudentTools({
+        finance: $('finance-calculator'),
+        grades: $('weighted-calculator'),
+        items: $('grade-items'),
+        add: $('add-grade-item'),
+      }),
+    )
+    .catch(() => {
+      $('calculator-status').textContent = 'Restart Roger to load the calculators.';
+      $('calculator-grid').hidden = true;
+    });
   const syncRail = () => {
     $('rail-more').open = !compactNav.matches;
   };
@@ -725,7 +956,34 @@ async function start() {
     $(id).addEventListener('click', () => $('upload-input').click());
   $('upload-input').addEventListener('change', () => {
     const file = $('upload-input').files[0];
-    if (file) void importFile(file);
+    if (file) void importFile(file, { saveLocally: true });
+  });
+  $('folder-button').addEventListener('click', () => $('folder-input').click());
+  $('folder-input').addEventListener('change', async (event) => {
+    if (state.importing || folderImport) return;
+    const input = event.target;
+    const total = input.files.length;
+    const controller = new AbortController();
+    folderImport = controller;
+    $('folder-button').disabled = true;
+    let added = 0;
+    try {
+      await readingReady;
+      for (let index = 0; index < Math.min(total, 200); index++) {
+        if (controller.signal.aborted || state.documents.length >= DOCUMENT_LIMITS.files) break;
+        const file = input.files[index];
+        if (!/\.(pdf|pptx|txt|md)$/i.test(file.name) || file.size > DOCUMENT_LIMITS.bytes) continue;
+        if (await importFile(file, { open: false, signal: controller.signal, saveLocally: true }))
+          added++;
+      }
+      status(
+        `Added ${added} of ${total} selected files${controller.signal.aborted ? ' before cancellation' : ''}.`,
+      );
+    } finally {
+      folderImport = undefined;
+      $('folder-button').disabled = false;
+      input.value = '';
+    }
   });
   $('library-search').addEventListener('input', renderLibrary);
   const rogerWidget = $('roger-widget');
@@ -747,7 +1005,7 @@ async function start() {
         source.append(option);
       }
       if ([...source.options].some((option) => option.value === previous)) source.value = previous;
-      source.hidden = !state.documents.length || $('roger-mode').value !== 'ask';
+      source.hidden = state.recording || !state.documents.length || $('roger-mode').value !== 'ask';
       if (!alreadyOpen) rogerResponse.replaceChildren();
     },
     onClose: () => {
@@ -777,6 +1035,10 @@ async function start() {
     const message = $('roger-message').value.trim();
     if (!message) {
       $('roger-message').focus();
+      return;
+    }
+    if (state.recording) {
+      await askDemo(message, rogerWidget, rogerResponse);
       return;
     }
     if (
@@ -1076,12 +1338,12 @@ async function start() {
         },
       });
     } finally {
-      if (rogerResponse.textContent) await rememberExchange(message, rogerResponse.textContent);
       $('roger-send').disabled = false;
       rogerWidget.dataset.state = 'idle';
     }
   });
   $('cancel-import')?.addEventListener('click', () => {
+    folderImport?.abort();
     state.importController?.abort();
     status('Cancelling document opening…');
   });
@@ -1113,9 +1375,15 @@ async function start() {
   function addQuoteNote() {
     const quote = pdfSelection?.quote || window.getSelection()?.toString().trim();
     if (!quote || !state.current) return;
-    state.current.notes += `\n\n> ${quote}\n\n— Page ${state.page + 1}\n`;
+    const notes = state.current.notes + `\n\n> ${quote}\n\n— Page ${state.page + 1}\n`;
+    if (notes.length > $('notes-input').maxLength) {
+      status('Download your notes before adding more. This reading has reached the notes limit.');
+      return;
+    }
+    state.current.notes = notes;
     $('notes-input').value = state.current.notes;
     $('notes-status').textContent = 'Not downloaded · session only';
+    updateReading(state.current, { notes });
     status('Selected passage added to your notes with its page number.');
   }
   $('quote-note').addEventListener('click', addQuoteNote);
@@ -1179,6 +1447,7 @@ async function start() {
       doc.text = text;
       doc.pages = pages;
       doc.revision = await textDigest(text);
+      updateReading(doc, { text, pages, revision: doc.revision });
       originalMode = false;
       renderPage();
       status(
@@ -1304,8 +1573,10 @@ async function start() {
   });
   $('stop-button').addEventListener('click', stop);
   $('notes-input').addEventListener('input', () => {
-    if (state.current) state.current.notes = $('notes-input').value;
+    if (!state.current) return;
+    state.current.notes = $('notes-input').value;
     $('notes-status').textContent = 'Not downloaded · session only';
+    updateReading(state.current, { notes: state.current.notes });
   });
   $('save-notes').addEventListener('click', () => {
     if (!state.current) return;
@@ -1358,7 +1629,18 @@ async function start() {
   });
   canvasPanel.bind();
   renderLibrary();
-  const session = await initialize();
+  const session = await sessionRequest;
+  if (session.preview)
+    $('library-save-note').textContent = 'Readings opened here stay in this preview session.';
+  state.recording = session.recording === true;
+  if (state.recording) {
+    $('roger-mode').hidden = true;
+    $('roger-ai').hidden = true;
+    $('roger-message').placeholder = 'Ask about a demo course…';
+    $('tool-builder-entry').hidden = true;
+  }
+  const demoSettings = $('demo-settings');
+  if (demoSettings) demoSettings.hidden = !session.recordingAvailable;
   canvasPanel.restore(session.canvas);
   if (session.canvas && !navigationTouched) {
     view('courses', { automatic: true, load: false });
@@ -1402,6 +1684,7 @@ window.addEventListener('beforeunload', () => {
   ocrController?.abort();
   state.question?.abort();
   state.importController?.abort();
+  folderImport?.abort();
   disposeDocuments(state.documents);
 });
 start().catch((error) => status(error.message || 'Reload Atlas Reader to start again.'));

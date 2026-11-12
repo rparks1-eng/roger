@@ -241,6 +241,34 @@ function sourcePrompt(files, request) {
     `USER REQUEST:\n${request}`,
   ].join('\n\n');
 }
+export async function captureAppAssets(root, assets, changed = new Map()) {
+  const project = await realpath(root);
+  const files = new Map();
+  let total = 0;
+  for (const [url, [relative, mime]] of assets) {
+    const full = path.resolve(project, relative);
+    if (!full.startsWith(`${project}${path.sep}`) || (await realpath(full)) !== full)
+      fail(409, 'Preview assets must be regular files inside this project.');
+    let bytes;
+    if (changed.has(relative)) bytes = Buffer.from(changed.get(relative));
+    else {
+      const handle = await open(full, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        const info = await handle.stat();
+        if (!info.isFile() || info.size > 12 * 1024 * 1024)
+          fail(413, 'A preview asset is too large.');
+        bytes = await handle.readFile();
+      } finally {
+        await handle.close();
+      }
+    }
+    total += bytes.length;
+    if (total > 24 * 1024 * 1024) fail(413, 'The app preview is too large.');
+    files.set(url, { bytes, mime });
+  }
+  return files;
+}
+
 export function createAppChangeService({
   root,
   assets,
@@ -308,33 +336,7 @@ export function createAppChangeService({
       status: 'preview',
     };
   }
-  async function capture(changed) {
-    const project = await sourceRoot;
-    const files = new Map();
-    let total = 0;
-    for (const [url, [relative, mime]] of assets) {
-      const full = path.resolve(project, relative);
-      if (!full.startsWith(`${project}${path.sep}`) || (await realpath(full)) !== full)
-        fail(409, 'Preview assets must be regular files inside this project.');
-      let bytes;
-      if (changed.has(relative)) bytes = Buffer.from(changed.get(relative));
-      else {
-        const handle = await open(full, constants.O_RDONLY | constants.O_NOFOLLOW);
-        try {
-          const info = await handle.stat();
-          if (!info.isFile() || info.size > 12 * 1024 * 1024)
-            fail(413, 'A preview asset is too large.');
-          bytes = await handle.readFile();
-        } finally {
-          await handle.close();
-        }
-      }
-      total += bytes.length;
-      if (total > 24 * 1024 * 1024) fail(413, 'The app preview is too large.');
-      files.set(url, { bytes, mime });
-    }
-    return files;
-  }
+
   return {
     async get({ owner = '' } = {}) {
       assertOpen();
@@ -473,7 +475,7 @@ export function createAppChangeService({
         checkAbort(operationSignal);
         let opened = false;
         preview = await previewFactory({
-          files: await capture(changed),
+          files: await captureAppAssets(await sourceRoot, assets, changed),
           onOpen: () => {
             opened = true;
           },

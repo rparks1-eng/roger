@@ -248,7 +248,7 @@ export async function createStudySet(value, signal, { fetcher = fetch } = {}) {
   let generated = null;
   let fallback = false;
   const useModel =
-    prepared.engine === 'local' && !['multiple-choice', 'true-false'].includes(prepared.mode);
+    prepared.engine === 'local' && ['flashcards', 'practice'].includes(prepared.mode);
   if (useModel) {
     const operation = scope(signal, 28_000);
     try {

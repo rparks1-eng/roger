@@ -174,6 +174,40 @@ class StudySetTests(unittest.TestCase):
         self.assertNotIn("five", str(result))
         self.assertTrue(all(card["answer"] in card["quote"] for card in result["cards"]))
 
+    def test_worksheet_only_compares_verified_percentages_from_one_source(self):
+        text = "The sample has a 15.25% rate and a 4% rate, with an invalid -2% and 105%."
+        sources = [
+            dict(id="a", kind="assignment", text="The other assignment counts for 40%."),
+            dict(id="m", kind="material", text=text),
+        ]
+        prepared = study_sets.prepare(dict(mode="worksheet", engine="quick", sources=sources))
+        result = study_sets.build(dict(prepared=prepared, generated=None))
+        self.assertEqual(
+            result["worksheet"]["rows"],
+            [
+                dict(sourceId="m", quote=text, value=15.25),
+                dict(sourceId="m", quote=text, value=4),
+            ],
+        )
+        sources[1]["text"] = "This unrelated course assessment counts for 10%."
+        prepared = study_sets.prepare(dict(mode="worksheet", engine="quick", sources=sources))
+        self.assertIsNone(study_sets.build(dict(prepared=prepared, generated=None))["worksheet"])
+
+    def test_discussion_prompt_contains_a_cited_excerpt_and_rubric(self):
+        text = "The case describes two teams testing alternative approaches."
+        prepared = study_sets.prepare(
+            dict(
+                mode="discussion",
+                engine="quick",
+                sources=[dict(id="m", kind="material", text=text)],
+            )
+        )
+        card = study_sets.build(dict(prepared=prepared, generated=None))["cards"][0]
+        self.assertEqual((card["sourceId"], card["quote"]), ("m", text))
+        self.assertIn("what claim", card["prompt"].lower())
+        self.assertIn("quote one specific detail", card["answer"])
+        self.assertFalse(card["generated"])
+
 
 class RetrievalTests(unittest.TestCase):
     def test_unicode_offsets_and_source_identity(self):

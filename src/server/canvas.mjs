@@ -1,5 +1,5 @@
 /** Read-only Babson Canvas transport. No credentials are persisted or logged. */
-import { downloadCanvasFile } from './canvas-download.mjs';
+import { ARCHIVE_FILE_EXTENSIONS, downloadCanvasFile } from './canvas-download.mjs';
 import { pythonDomain } from './python-domain.mjs';
 export const CANVAS_ORIGIN = 'https://babson.instructure.com';
 const JSON_LIMIT = 1024 * 1024;
@@ -96,7 +96,10 @@ async function request(token, url, { fetcher = fetch, signal } = {}) {
         403,
       );
     if (!response.ok)
-      throw new CanvasError('upstream', 'Canvas could not complete this request. Try again later.');
+      throw new CanvasError(
+        response.status === 503 ? 'pending' : 'upstream',
+        'Canvas could not complete this request. Try again later.',
+      );
     if (response.url && trustedURL(response.url).href !== safe.href)
       throw new CanvasError(
         'unsupported_redirect',
@@ -396,6 +399,134 @@ export async function readCanvasPage(token, courseId, pageUrl, options = {}) {
   );
   return normalize('page', { raw: data, courseId: cid }, options);
 }
+
+async function readOwnCanvasGroups(token, courseId, options) {
+  const result = await collection(
+    token,
+    `/api/v1/courses/${courseId}/groups?only_own_groups=true`,
+    options,
+  );
+  return {
+    groups: await normalize('groups', { raw: result.items, courseId }, options),
+    complete: result.complete,
+  };
+}
+
+async function canvasCommunityContext(token, courseId, groupId, options) {
+  if (groupId == null) return { path: `/api/v1/courses/${courseId}`, group: null };
+  const gid = id(groupId);
+  const { groups } = await readOwnCanvasGroups(token, courseId, options);
+  const group = groups.find((item) => item.id === gid);
+  if (!group)
+    throw new CanvasError(
+      'unavailable',
+      'Canvas did not confirm that you belong to this group for the selected course.',
+      403,
+    );
+  return { path: `/api/v1/groups/${gid}`, group };
+}
+
+function communitySection(section) {
+  if (!['announcements', 'discussions'].includes(section))
+    throw new CanvasError('invalid_section', 'Choose announcements or discussions.', 400);
+  return section === 'announcements';
+}
+
+export async function listCanvasCommunity(
+  token,
+  courseId,
+  { section, groupId } = {},
+  options = {},
+) {
+  const cid = id(courseId);
+  if (section === 'groups' && groupId == null) {
+    const { groups, complete } = await readOwnCanvasGroups(token, cid, options);
+    return {
+      groups,
+      coverage: coverage(complete ? [] : ['Only the first 300 groups or three pages were loaded.']),
+    };
+  }
+  const announcement = communitySection(section);
+  const { path, group } = await canvasCommunityContext(token, cid, groupId, options);
+  const result = await collection(
+    token,
+    `${path}/discussion_topics${announcement ? '?only_announcements=true' : ''}`,
+    options,
+  );
+  return {
+    group,
+    topics: await normalize(
+      'topics',
+      { raw: result.items, courseId: cid, groupId: group?.id, announcement },
+      options,
+    ),
+    coverage: coverage(
+      result.complete ? [] : ['Only the first 300 topics or three pages were loaded.'],
+    ),
+  };
+}
+
+export async function readCanvasCommunityTopic(
+  token,
+  courseId,
+  topicId,
+  { section, groupId } = {},
+  options = {},
+) {
+  const cid = id(courseId);
+  const tid = id(topicId);
+  const announcement = communitySection(section);
+  const { path, group } = await canvasCommunityContext(token, cid, groupId, options);
+  const base = `${path}/discussion_topics/${tid}`;
+  const { data } = await request(token, base, options);
+  const { groupChildren, ...topic } = await normalize(
+    'topic',
+    { raw: data, courseId: cid, groupId: group?.id, topicId: tid, announcement },
+    options,
+  );
+  const result = { topic, replies: [], groupTopic: null, replyIssue: null };
+  if (topic.locked) return result;
+  if (!group && topic.groupDiscussion) {
+    const { groups } = await readOwnCanvasGroups(token, cid, options);
+    const membership = new Set(groups.map((item) => item.id));
+    const matches = groupChildren.filter((child) => membership.has(child.groupId));
+    if (matches.length === 1)
+      result.groupTopic = {
+        ...matches[0],
+        name: groups.find((item) => item.id === matches[0].groupId).name,
+      };
+    else result.replyIssue = 'Open this topic in Canvas to view your group discussion.';
+    return result;
+  }
+  if (topic.repliesRestricted) {
+    result.replyIssue = topic.initialPostRequired
+      ? 'Canvas requires an initial post before it shows replies. Open the original topic to participate.'
+      : 'Canvas has restricted the replies. Open the original topic for access details.';
+    return result;
+  }
+  try {
+    const { data: thread } = await request(token, `${base}/view?include_new_entries=1`, options);
+    const { replies, partial } = await normalize(
+      'thread',
+      { raw: thread, courseId: cid, groupId: group?.id },
+      options,
+    );
+    result.replies = replies;
+    if (partial)
+      result.replyIssue =
+        'Some replies were shortened or omitted. Open Canvas for the complete thread.';
+  } catch (error) {
+    if (options.signal?.aborted || !['unavailable', 'too_large', 'pending'].includes(error.code))
+      throw error;
+    result.replyIssue =
+      error.code === 'too_large'
+        ? 'This thread exceeds the reading size limit. Open it in Canvas for the replies.'
+        : error.code === 'pending'
+          ? 'Canvas is still preparing replies. Try reopening the topic or view it in Canvas.'
+          : 'Canvas has restricted the replies. Open the original topic for access details.';
+  }
+  return result;
+}
 export const CANVAS_WORD_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const syllabusName = (value) =>
@@ -560,12 +691,44 @@ export async function getCanvasSyllabusFile(token, courseId, fileId, options = {
 export async function getCanvasStudyFile(token, courseId, fileId, options = {}) {
   return readCourseFile(token, courseId, fileId, options, 'study');
 }
+export async function listCanvasExportFiles(token, courseId, options = {}) {
+  const cid = id(courseId);
+  const reasons = [];
+  const files = await optionalCollection(
+    token,
+    options,
+    reasons,
+  )(`/api/v1/courses/${cid}/files`, 'Course files');
+  return {
+    files: files.map((file) => {
+      const fid = id(file.id);
+      return {
+        fileId: fid,
+        title: plain(file.display_name || file.filename, 200),
+        url: `${CANVAS_ORIGIN}/courses/${cid}/files/${fid}`,
+        locked: Boolean(file.locked_for_user || file.locked || file.hidden_for_user || file.hidden),
+      };
+    }),
+    coverage: coverage(reasons),
+  };
+}
+export async function getCanvasExportFile(token, courseId, fileId, options = {}) {
+  return readCourseFile(token, courseId, fileId, options, 'export');
+}
 async function readCourseFile(token, courseId, fileId, options, purpose) {
   const syllabus = purpose === 'syllabus';
+  const exporting = purpose === 'export';
   const cid = id(courseId);
   const fid = id(fileId);
   const { data } = await request(token, `/api/v1/courses/${cid}/files/${fid}`, options);
-  if (data.locked_for_user || data.locked || (!syllabus && data.hidden_for_user))
+  if (exporting && String(data.id) !== fid)
+    throw new CanvasError('invalid_response', 'Canvas returned a different file.', 422);
+  if (
+    data.locked_for_user ||
+    data.locked ||
+    (!syllabus && data.hidden_for_user) ||
+    (exporting && data.hidden)
+  )
     throw new CanvasError('locked', 'This file is locked or hidden in Canvas.', 403);
   if (syllabus && data.hidden_for_user) {
     // A hidden-in-Files item must have a fresh student-visible syllabus link in this course.
@@ -578,22 +741,26 @@ async function readCourseFile(token, courseId, fileId, options, purpose) {
     .trim()
     .toLowerCase();
   if (
-    ![
-      'application/pdf',
-      'text/plain',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      ...(purpose !== 'reading' ? [CANVAS_WORD_MIME] : []),
-      ...(purpose === 'study' ? ['text/html'] : []),
-    ].includes(mime)
+    !(exporting
+      ? Object.hasOwn(ARCHIVE_FILE_EXTENSIONS, mime)
+      : [
+          'application/pdf',
+          'text/plain',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          ...(purpose !== 'reading' ? [CANVAS_WORD_MIME] : []),
+          ...(purpose === 'study' ? ['text/html'] : []),
+        ].includes(mime))
   )
     throw new CanvasError(
       'unsupported_type',
-      'This reader supports PDF, PowerPoint (.pptx) and plain-text files. Other formats need their original application.',
+      exporting
+        ? 'This file type is available as a Canvas reference.'
+        : 'This reader supports PDF, PowerPoint (.pptx) and plain-text files. Other formats need their original application.',
       422,
     );
   if (
     Number(data.size) > FILE_LIMIT ||
-    (mime === CANVAS_WORD_MIME && Number(data.size) > 2 * 1024 * 1024)
+    (!exporting && mime === CANVAS_WORD_MIME && Number(data.size) > 2 * 1024 * 1024)
   )
     throw new CanvasError('too_large', 'This reading exceeds the 12 MiB limit.', 413);
   if (typeof data.url !== 'string')
@@ -605,6 +772,7 @@ async function readCourseFile(token, courseId, fileId, options, purpose) {
     ...options,
     courseId: cid,
     fileId: fid,
+    ...(exporting ? { accept: `${mime},application/octet-stream` } : {}),
   });
   const actual = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
   if (actual && actual !== mime && actual !== 'application/octet-stream')
@@ -612,13 +780,20 @@ async function readCourseFile(token, courseId, fileId, options, purpose) {
   if (mime === 'application/pdf' && new TextDecoder().decode(bytes.subarray(0, 5)) !== '%PDF-')
     throw new CanvasError('invalid_file', 'Canvas did not return a valid PDF.', 422);
   if (
-    mime === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' &&
+    (mime === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      (exporting && mime.startsWith('application/vnd.openxmlformats-officedocument.'))) &&
     (bytes.length < 4 ||
       bytes[0] !== 0x50 ||
       bytes[1] !== 0x4b ||
       bytes[2] !== 0x03 ||
       bytes[3] !== 0x04)
   )
-    throw new CanvasError('invalid_file', 'Canvas did not return a valid PowerPoint archive.', 422);
+    throw new CanvasError(
+      'invalid_file',
+      exporting
+        ? 'Canvas did not return a valid Office archive.'
+        : 'Canvas did not return a valid PowerPoint archive.',
+      422,
+    );
   return { name: plain(data.display_name || data.filename || 'Reading', 200), mime, bytes };
 }

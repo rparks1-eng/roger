@@ -47,12 +47,15 @@ function fixture(step = 1) {
     title: 'Practice counter',
     summary: `A counter increasing by ${step}.`,
     html: `<!doctype html><html><head><meta charset="utf-8"><title>Practice counter</title></head><body>
-      <h1>Practice counter</h1><button id="increment">Increment</button><output id="count">0</output>
+      <h1>Practice counter</h1><button id="increment" disabled>Increment</button><output id="count">0</output>
       <button id="parent-probe">Check parent isolation</button><output id="parent-result"></output>
       <button id="fetch-probe">Check network isolation</button><output id="fetch-result"></output>
       <button id="navigation-probe">Check navigation isolation</button>
       <script>
-      let count=0; document.querySelector('#increment').onclick=()=>document.querySelector('#count').textContent=String(count+=${step});
+      let count=0;
+      const increment=document.querySelector('#increment');
+      increment.onclick=()=>document.querySelector('#count').textContent=String(count+=${step});
+      increment.disabled=false;
       document.querySelector('#parent-probe').onclick=()=>{try{parent.document.body;document.querySelector('#parent-result').textContent='exposed';}catch{document.querySelector('#parent-result').textContent='blocked';}};
       document.querySelector('#fetch-probe').onclick=async()=>{try{await fetch('https://roger-blocked.invalid/probe');document.querySelector('#fetch-result').textContent='exposed';}catch{document.querySelector('#fetch-result').textContent='blocked';}};
       document.querySelector('#navigation-probe').onclick=()=>{location.assign('https://roger-blocked.invalid/navigation');};
@@ -155,14 +158,19 @@ try {
     external.push(route.request().url());
     return route.abort();
   });
+  const openTools = async () => {
+    await page.locator('.rail-main [data-view=courses]').click();
+    await page.locator('.desk-links [data-view=tools]').click();
+    await page.getByRole('button', { name: 'Your tools', exact: true }).click();
+    await page.locator('.feature-list').waitFor();
+  };
   const navigate = async () => {
     await page.goto(origin);
     await page
       .locator('#roger-ai')
       .filter({ hasText: 'AI · codex' })
       .waitFor({ state: 'attached' });
-    await page.getByRole('button', { name: 'Your tools', exact: true }).click();
-    await page.locator('.feature-list').waitFor();
+    await openTools();
   };
   const build = async (request) => {
     await page.locator('#builder-request').fill(request);
@@ -268,7 +276,7 @@ try {
   await boundedWait(slowAborted, 'Leave cancellation');
   assert.equal(await page.locator('.feature-frame').count(), 0);
   assert.equal(await page.locator('#builder-view').isVisible(), false);
-  await page.getByRole('button', { name: 'Your tools', exact: true }).click();
+  await openTools();
   await increment(2);
   assert.ok(
     violations.length >= 2,

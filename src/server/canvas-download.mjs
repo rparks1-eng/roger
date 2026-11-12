@@ -7,6 +7,17 @@
  */
 const ORIGIN = 'https://babson.instructure.com';
 const LIMIT = 12 * 1024 * 1024;
+export const ARCHIVE_FILE_EXTENSIONS = Object.freeze({
+  'application/pdf': 'pdf',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'text/plain': 'txt',
+  'text/markdown': 'md',
+  'text/csv': 'csv',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+});
 class DownloadError extends Error {
   constructor(code, message, status = 502) {
     super(message);
@@ -50,7 +61,7 @@ function bounded(operation, signal) {
 export async function downloadCanvasFile(
   token,
   initialURL,
-  { courseId, fileId, fetcher = fetch, signal } = {},
+  { courseId, fileId, fetcher = fetch, signal, accept } = {},
 ) {
   const cid = String(courseId ?? ''),
     fid = String(fileId ?? '');
@@ -74,6 +85,7 @@ export async function downloadCanvasFile(
       seen.add(url.href);
       const headers = {
         Accept:
+          accept ||
           'application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/octet-stream',
       };
       if (hop === 0) headers.Authorization = `Bearer ${token}`;

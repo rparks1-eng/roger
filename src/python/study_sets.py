@@ -7,6 +7,7 @@ from study import plain
 
 KINDS = ("assignment", "syllabus", "notes", "material")
 CHOICE_MODES = ("multiple-choice", "true-false")
+SOURCE_MODES = (*CHOICE_MODES, "discussion", "worksheet")
 LABELS = {
     "assignment": "the assignment",
     "syllabus": "the syllabus",
@@ -18,7 +19,15 @@ SIGNAL = re.compile(
     r"\b(?:due|submit|include|exam|grade|grading|project|review|must|required)\b|\d\s*%", re.I
 )
 NUMBER = re.compile(r"\b\d+(?:\.\d+)?\s*%|\b\d{1,2}:\d{2}(?:\s*[ap]m)?\b", re.I)
+# Only accept explicit 0–100 percentages representable to two decimal places.
+PERCENT = re.compile(r"(?<![\w.,/+−-])(100(?:\.0{1,2})?|[0-9]{1,2}(?:\.[0-9]{1,2})?)\s*%")
 SPLIT = re.compile(r"\n+|(?<=[.!?])\s+(?=[A-Z])")
+REFLECTIONS = {
+    "assignment": "Why might this requirement matter, and how would you put it into practice?",
+    "syllabus": "How would this policy affect a choice you make in this course?",
+    "notes": "What is the main idea here, and what example would help you explain it?",
+    "material": "What claim is the author making, and when might it need a qualification?",
+}
 
 
 def normalized(text):
@@ -33,7 +42,7 @@ def prepare(value, *, allow_empty=False):
     mode, engine, sources = value["mode"], value["engine"], value["sources"]
     topic = value.get("focus", "")
     require(
-        mode in ("flashcards", "practice", *CHOICE_MODES)
+        mode in ("flashcards", "practice", *SOURCE_MODES)
         and engine in ("quick", "local")
         and isinstance(sources, list)
         and 0 < len(sources) <= 48
@@ -57,17 +66,30 @@ def prepare(value, *, allow_empty=False):
         total += len(text)
         require(total <= 80_000, "oversized")
         for block in SPLIT.split(text):
+            # An arbitrary chunk boundary can split a number or duplicate it in the overlap.
+            if mode == "worksheet" and len(block) > 400:
+                continue
             # Long paragraphs are searched throughout, not only their opening line.
             for start in range(0, len(block), 400):
                 line = block[start : start + 440].strip()
-                if plain(line) and len(line) >= 8 and len(line.split()) >= 2:
+                if (
+                    plain(line)
+                    and len(line) >= 8
+                    and len(line.split()) >= 2
+                    and (mode != "worksheet" or PERCENT.search(line))
+                ):
                     groups[kind].append(dict(sourceId=sid, kind=kind, quote=line))
     focus = set(WORD.findall(" ".join(p["quote"] for p in groups["assignment"]).casefold()))
     topic_terms = set(re.findall(r"[\w-]{2,}", topic.casefold()))
+
+    def topic_match(passage):
+        return len(topic_terms.intersection(re.findall(r"[\w-]{2,}", passage["quote"].casefold())))
+
     for kind, group in groups.items():
         group.sort(
             key=lambda p: (
-                -len(topic_terms.intersection(re.findall(r"[\w-]{2,}", p["quote"].casefold()))),
+                -topic_match(p),
+                -len(PERCENT.findall(p["quote"])) if mode == "worksheet" else 0,
                 -len(focus.intersection(WORD.findall(p["quote"].casefold())))
                 if kind != "assignment"
                 else 0,
@@ -85,6 +107,8 @@ def prepare(value, *, allow_empty=False):
             passages.append(dict(ref=f"p{len(passages) + 1}", **item))
             if sum(entry["kind"] == kind for entry in passages) == 5:
                 break
+    if mode == "worksheet":
+        passages.sort(key=topic_match, reverse=True)
     if not allow_empty:
         require(bool(passages))
     return dict(mode=mode, engine=engine, passages=passages)
@@ -105,6 +129,15 @@ def recall_detail(quote):
 
 def quick_card(passage, mode):
     quote = passage["quote"]
+    if mode == "discussion":
+        return dict(
+            prompt=REFLECTIONS[passage["kind"]],
+            answer="State your interpretation, quote one specific detail from the source, "
+            "and explain how that detail supports your point.",
+            sourceId=passage["sourceId"],
+            quote=quote,
+            generated=False,
+        )
     answer, masked = recall_detail(quote)
     prompt = (
         masked
@@ -163,12 +196,27 @@ def choice_card(passage, mode, answers, index):
     )
 
 
+def percentage_worksheet(passages):
+    sources = {}
+    for passage in passages:
+        source_id, quote = passage["sourceId"], passage["quote"]
+        rows = sources.setdefault(source_id, [])
+        for hit in PERCENT.finditer(quote):
+            if len(rows) == 4:
+                break
+            rows.append(dict(sourceId=source_id, quote=quote, value=float(hit[1])))
+    # Do not compare values across unrelated readings.
+    return next((dict(rows=rows) for rows in sources.values() if len(rows) >= 2), None)
+
+
 def build(value):
     require(exact(value, ["prepared", "generated"]))
     prepared = value["prepared"]
     require(isinstance(prepared, dict) and isinstance(prepared.get("passages"), list))
     passages = prepared["passages"]
     mode = prepared["mode"]
+    if mode == "worksheet":
+        return dict(worksheet=percentage_worksheet(passages), enhanced=0)
     answers = {}
     if mode in CHOICE_MODES:
         for passage in passages:
@@ -187,7 +235,7 @@ def build(value):
     kinds = set()
     generated = value["generated"]
     if (
-        mode not in CHOICE_MODES
+        mode not in SOURCE_MODES
         and exact(generated, ["cards"])
         and isinstance(generated["cards"], list)
     ):

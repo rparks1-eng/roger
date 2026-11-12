@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { qaScratch, browserOptions } from './quality/scratch.mjs';
@@ -51,6 +52,7 @@ try {
   // of a Mac audio device. Real speaker/voice quality is a separate live check.
   browser = await chromium.launch({
     ...browserOptions,
+    downloadsPath: run.work,
     args: [...(browserOptions.args || []), '--disable-audio-output'],
   });
   const page = await browser.newPage();
@@ -493,6 +495,215 @@ try {
   assert.equal(courseSearch.clearCount, 0);
   assert.equal(courseSearch.allCount, 13);
   assert.equal(courseSearch.disabled, 0);
+  await page.evaluate(async () => {
+    const { mountCourseStudy } = await import('/client/course-study-ui.mjs');
+    const { api } = await import('/client/api.mjs');
+    const document = globalThis.document;
+    const fixture = document.createElement('section');
+    fixture.id = 'external-study-fixture';
+    document.body.append(fixture);
+    let active;
+    const invalidate = () => active?.abort();
+    mountCourseStudy({
+      content: fixture,
+      course: {
+        course: { id: '1', name: 'Fixture course' },
+        assignments: [],
+        modules: [
+          {
+            name: 'Fixture module',
+            items: [
+              {
+                id: '81',
+                title: 'Sample lecture',
+                studyCategory: 'Videos',
+                fileId: '91',
+                url: 'https://babson.instructure.com/courses/1/modules/items/81',
+              },
+              {
+                id: '82',
+                title: 'Supplemental reading',
+                studyCategory: 'Links',
+                url: 'https://babson.instructure.com/courses/1/modules/items/82',
+              },
+              {
+                id: '83',
+                title: 'Restricted video',
+                studyCategory: 'Videos',
+                locked: true,
+                url: 'https://babson.instructure.com/courses/1/modules/items/83',
+              },
+            ],
+          },
+        ],
+      },
+      draft: { mode: 'discussion', notes: '', files: [], decks: new Map() },
+      loader: {
+        discover: async () => ({ candidates: [] }),
+        readMaterial() {
+          throw new Error('External content must use the attached text.');
+        },
+      },
+      api,
+      operation: () => {
+        invalidate();
+        const controller = new AbortController();
+        active = controller;
+        return {
+          signal: controller.signal,
+          cancel: () => controller.abort(),
+          valid: () => active === controller && !controller.signal.aborted,
+        };
+      },
+      invalidate,
+      importFile: () => {},
+      plainText: (html) => html,
+      external: (label, url) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.textContent = label;
+        return link;
+      },
+    });
+  });
+  const externalStudy = page.locator('#external-study-fixture');
+  await externalStudy
+    .getByText('0 of 0 available course sources selected', { exact: false })
+    .waitFor();
+  await externalStudy.getByText('Videos · 2', { exact: true }).click();
+  const lecture = externalStudy.getByRole('listitem').filter({ hasText: 'Sample lecture' });
+  const restricted = externalStudy.getByRole('listitem').filter({ hasText: 'Restricted video' });
+  assert.equal(await restricted.getByText('Locked in Canvas').isVisible(), true);
+  assert.equal(await restricted.getByText('Attach transcript').count(), 0);
+  await lecture.getByText('Attach transcript', { exact: true }).click();
+  await lecture.getByText('Unavailable for practice until text is attached.').waitFor();
+  await lecture.getByLabel('Load local text file').setInputFiles({
+    name: 'lecture.vtt',
+    mimeType: 'text/vtt',
+    buffer: Buffer.from(
+      'WEBVTT\nKind: captions\nLanguage: en\n\nNOTE Retrieval evidence for editing only.\nThis is not a caption.\n\n00:00:05.000 --> 00:00:10.000\nRetrieval uses linked readings as evidence for the answer.\n\n00:00:12.000 --> 00:00:14.000\nThe instructor reviews a second example.',
+    ),
+  });
+  await lecture.getByText('Text loaded.', { exact: false }).waitFor();
+  await lecture.getByRole('button', { name: 'Use attached text' }).click();
+  await lecture.getByRole('checkbox', { name: 'Sample lecture' }).waitFor();
+  assert.equal(await lecture.getByRole('checkbox').isChecked(), true);
+  await externalStudy.getByText('Links · 1', { exact: true }).click();
+  const reading = externalStudy.getByRole('listitem').filter({ hasText: 'Supplemental reading' });
+  await reading.getByText('Attach reading text', { exact: true }).click();
+  await reading
+    .getByRole('textbox', { name: 'Reading text for Supplemental reading' })
+    .fill('This sample reading compares several classroom discussion styles.');
+  await reading.getByRole('button', { name: 'Use attached text' }).click();
+  await externalStudy
+    .getByText('2 of 2 available course sources selected', { exact: false })
+    .waitFor();
+  await externalStudy.getByRole('button', { name: 'Open exam practice' }).click();
+  await externalStudy
+    .getByRole('textbox', { name: 'Exam topic (optional)' })
+    .fill('Retrieval evidence');
+  await externalStudy.getByRole('button', { name: 'Build set', exact: true }).click();
+  const transcriptCitation = externalStudy.locator('.study-citation');
+  await transcriptCitation
+    .getByText('Sample lecture · 00:00:05.000 · Your attached transcript')
+    .waitFor();
+  assert.equal(
+    await transcriptCitation.getByRole('link', { name: 'Open Canvas item' }).getAttribute('href'),
+    'https://babson.instructure.com/courses/1/modules/items/81',
+  );
+  await externalStudy
+    .getByText('Retrieval uses linked readings as evidence for the answer.')
+    .waitFor();
+  await lecture.getByRole('button', { name: 'Remove attached text' }).click();
+  assert.equal(await lecture.getByRole('checkbox').isVisible(), false);
+  assert.equal(await transcriptCitation.count(), 0);
+  await externalStudy
+    .getByText('1 of 1 available course sources selected', { exact: false })
+    .waitFor();
+  await externalStudy.evaluate((node) => node.remove());
+  await page.evaluate(async () => {
+    const { mountAssignmentStudy } = await import('/client/study-ui.mjs');
+    const { api } = await import('/client/api.mjs');
+    const document = globalThis.document;
+    const fixture = document.createElement('section');
+    fixture.id = 'study-format-fixture';
+    const instructions = 'Projects count for 40%, discussion for 35%, and quizzes for 25%.';
+    const source = document.createElement('p');
+    source.id = 'assignment-instructions';
+    source.tabIndex = -1;
+    source.textContent = instructions;
+    const content = document.createElement('div');
+    const reopen = document.createElement('button');
+    reopen.type = 'button';
+    reopen.textContent = 'Reopen fixture Study';
+    const draft = { mode: 'discussion', notes: '', files: [], decks: new Map() };
+    const mount = () => {
+      content.replaceChildren();
+      mountAssignmentStudy({
+        container: content,
+        assignment: { name: '=1+1', url: 'https://babson.instructure.com/courses/1/assignments/2' },
+        courseId: '1',
+        instructions,
+        draft,
+        loader: { discover: async () => ({ candidates: [] }) },
+        api,
+        operation: () => {
+          const controller = new AbortController();
+          return {
+            signal: controller.signal,
+            valid: () => !controller.signal.aborted,
+            cancel: () => controller.abort(),
+          };
+        },
+      });
+    };
+    reopen.addEventListener('click', mount);
+    fixture.append(source, reopen, content);
+    document.body.append(fixture);
+    mount();
+  });
+  const study = page.locator('#study-format-fixture');
+  const build = study.getByRole('button', { name: 'Build set', exact: true });
+  await build.click();
+  const discussion = study.getByRole('textbox', { name: 'Your response' });
+  await discussion.fill('The project has the greatest weight in this assignment.');
+  await study.getByRole('button', { name: 'Show rubric' }).click();
+  await study.getByText('State your interpretation', { exact: false }).waitFor();
+  await study.getByRole('button', { name: 'Reopen fixture Study' }).click();
+  await study.getByText('Reopened this set from memory.').waitFor();
+  assert.match(await discussion.inputValue(), /greatest weight/);
+  const discussionSaved = page.waitForEvent('download');
+  await study.getByRole('button', { name: 'Download discussion prompts' }).click();
+  const discussionFile = await readFile(await (await discussionSaved).path(), 'utf8');
+  assert.match(discussionFile, /greatest weight/);
+  assert.match(discussionFile, /Projects count for 40%/);
+  await study.getByLabel('Format').selectOption('worksheet');
+  await build.click();
+  await study.getByText('Average 33.33% · range 15 percentage points').waitFor();
+  const input = study.getByRole('spinbutton', { name: 'Practice percentage in B2' });
+  await input.fill('75.25');
+  await study.getByText('Average 45.08% · range 50.25 percentage points').waitFor();
+  const download = study.getByRole('button', { name: 'Download worksheet CSV' });
+  await input.fill('101');
+  assert.equal(await download.isEnabled(), false);
+  await input.fill('75.25');
+  await study.getByText('Source for B2', { exact: true }).click();
+  const citation = study.getByRole('button', { name: 'Go to instructions', exact: true });
+  await citation.focus();
+  await citation.press('Enter');
+  assert.equal(await study.locator('#assignment-instructions:focus').count(), 1);
+  await study.getByRole('button', { name: 'Reopen fixture Study' }).click();
+  await study.getByText('Reopened this worksheet with your edits.').waitFor();
+  assert.equal(await input.inputValue(), '75.25');
+  const worksheetSaved = page.waitForEvent('download');
+  await download.click();
+  const worksheetFile = await readFile(await (await worksheetSaved).path(), 'utf8');
+  assert.match(
+    worksheetFile,
+    /B2,75\.25,40,"Source: =1\+1","URL: https:\/\/babson\.instructure\.com\/courses\/1\/assignments\/2","Quote: Projects count for 40%/,
+  );
+  assert.ok(worksheetFile.includes('Average,"=ROUND(AVERAGE(B2:B4),2)"'));
+  assert.ok(worksheetFile.includes('Range,"=ROUND(MAX(B2:B4)-MIN(B2:B4),2)"'));
   assert.deepEqual(errors, []);
   await browser.close();
   browser = null;
