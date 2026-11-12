@@ -353,6 +353,7 @@ try {
   );
   await page.locator('.rail-main [data-view=courses]').click();
   await page.locator('#canvas-setup [data-view=settings]').click();
+  await page.getByText('Local developer setup', { exact: true }).click();
   await page.locator('#canvas-token').fill('synthetic-owner-test-token');
   await page.locator('#canvas-connect button').click();
   await page

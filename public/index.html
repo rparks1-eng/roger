@@ -265,23 +265,41 @@
                   <p>Import classes and assignments.</p>
                 </div>
               </div>
-              <form id="canvas-connect">
-                <label for="canvas-token">Your Canvas access token</label>
-                <div class="input-action">
-                  <input
-                    id="canvas-token"
-                    name="token"
-                    type="password"
-                    autocomplete="off"
-                    placeholder="Paste your own access token"
-                    required
-                  /><button class="button button-primary" type="submit">Connect</button>
-                </div>
-                <p class="field-hint">
-                  For institution-authorized testing. Student sign-in requires a Canvas integration
-                  approved by the school.
+              <div id="canvas-setup-settings">
+                <p id="canvas-sign-in-help" class="field-hint">
+                  Campus sign-in requires a Babson-approved Roger integration.
                 </p>
-              </form>
+                <button id="canvas-sign-in" class="button button-primary" type="button" hidden>
+                  Sign in with Babson Canvas
+                </button>
+                <details>
+                  <summary>Local developer setup</summary>
+                  <p class="field-hint">
+                    For your own institution-authorized testing. Open your Canvas account settings
+                    to manage a test token.
+                  </p>
+                  <a
+                    class="inline-link"
+                    href="https://babson.instructure.com/profile/settings"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Open Canvas account settings</a
+                  >
+                  <form id="canvas-connect">
+                    <label for="canvas-token">Canvas test token</label>
+                    <div class="input-action">
+                      <input
+                        id="canvas-token"
+                        name="token"
+                        type="password"
+                        autocomplete="off"
+                        placeholder="Paste your test token"
+                        required
+                      /><button class="button button-secondary" type="submit">Connect</button>
+                    </div>
+                  </form>
+                </details>
+              </div>
               <div class="connection-actions">
                 <p id="canvas-status" class="muted" role="status">Not connected</p>
                 <button id="canvas-disconnect" class="button button-quiet" hidden>
@@ -292,22 +310,27 @@
 
             <div class="settings-ai">
               <h2>AI provider</h2>
-              <p>Choose the account or provider Roger uses for questions and app changes.</p>
+              <p>Sign in to Codex or connect another provider with an API key.</p>
               <button type="button" class="button button-secondary" data-view="connections">
-                Manage AI
+                Set up AI
               </button>
             </div>
             <section id="demo-settings" class="settings-ai" aria-labelledby="demo-heading" hidden>
               <h2 id="demo-heading">Demo mode</h2>
-              <p>Record or present Roger with fictional classes, assignments, and readings.</p>
-              <a
+              <p id="demo-help">
+                Mask your course details and submission statuses while presenting.
+              </p>
+              <button
+                id="demo-toggle"
                 class="button button-secondary"
-                href="/demo"
-                target="_blank"
-                rel="noopener noreferrer"
+                type="button"
+                role="switch"
+                aria-label="Demo mode"
+                aria-checked="false"
+                aria-describedby="demo-help"
               >
-                Open demo mode
-              </a>
+                Demo mode
+              </button>
             </section>
             <p id="connection-status" class="sr-only" role="status">Local workspace</p>
           </section>
@@ -505,54 +528,13 @@
             <div id="calculator-grid" class="calculator-grid">
               <section class="calculator-card" aria-labelledby="finance-heading">
                 <h2 id="finance-heading">Financial calculator</h2>
-                <form id="finance-calculator">
-                  <label
-                    >Calculation
-                    <select name="kind">
-                      <option value="savings">Future value</option>
-                      <option value="loan">Monthly loan payment</option>
-                    </select>
-                  </label>
-                  <label
-                    >Starting amount ($)
-                    <input
-                      name="amount"
-                      type="number"
-                      min="0"
-                      max="1000000000"
-                      step="0.01"
-                      value="1000"
-                      required
-                    />
-                  </label>
-                  <label
-                    >Annual rate (%)
-                    <input
-                      name="rate"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value="5"
-                      required
-                    />
-                  </label>
-                  <label
-                    >Term (months)
-                    <input
-                      name="months"
-                      type="number"
-                      min="1"
-                      max="1200"
-                      step="1"
-                      value="12"
-                      required
-                    />
-                  </label>
-                  <p class="field-hint">Monthly compounding. Loan payments exclude fees.</p>
-                  <button type="submit" class="button button-primary">Calculate</button>
-                  <output class="calculator-result" role="status"></output>
-                </form>
+                <p>
+                  Time value of money, cash flow, and financial worksheets on a BA II Plus-style
+                  keypad.
+                </p>
+                <button type="button" class="button button-primary" data-view="finance">
+                  Open calculator
+                </button>
               </section>
               <section class="calculator-card" aria-labelledby="weighted-heading">
                 <h2 id="weighted-heading">Weighted grades</h2>
@@ -568,12 +550,125 @@
                   <output class="calculator-result" role="status"></output>
                 </form>
               </section>
+              <section class="calculator-card" aria-labelledby="gpa-heading">
+                <h2 id="gpa-heading">Semester GPA</h2>
+                <p class="field-hint">Estimate your GPA from letter grades and credits.</p>
+                <form id="gpa-calculator">
+                  <div id="gpa-courses"></div>
+                  <button id="add-gpa-course" type="button" class="button button-quiet">
+                    Add course
+                  </button>
+                  <button type="submit" class="button button-primary">Calculate GPA</button>
+                  <output class="calculator-result" role="status"></output>
+                </form>
+                <a
+                  class="inline-link"
+                  href="https://undergraduatehandbook.babson.edu/grading-0"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Babson undergraduate grade scale</a
+                >
+              </section>
+              <section class="calculator-card" aria-labelledby="target-heading">
+                <h2 id="target-heading">Final grade target</h2>
+                <p class="field-hint">Find the score you need on the remaining work.</p>
+                <form id="target-calculator">
+                  <label
+                    >Average on graded work (%)
+                    <input name="average" type="number" min="0" max="100" step="0.01" required
+                  /></label>
+                  <label
+                    >Course weight already graded (%)
+                    <input name="completed" type="number" min="0" max="100" step="0.01" required
+                  /></label>
+                  <label
+                    >Target course grade (%)
+                    <input name="target" type="number" min="0" max="100" step="0.01" required
+                  /></label>
+                  <button type="submit" class="button button-primary">Find required score</button>
+                  <output class="calculator-result" role="status"></output>
+                </form>
+              </section>
+              <section class="calculator-card" aria-labelledby="break-even-heading">
+                <h2 id="break-even-heading">Venture break-even</h2>
+                <p class="field-hint">
+                  Estimate how many units a project needs to sell to cover its costs.
+                </p>
+                <form id="break-even-calculator">
+                  <label
+                    >Fixed costs ($) <input name="fixed" type="number" min="0" step="0.01" required
+                  /></label>
+                  <label
+                    >Price per unit ($)
+                    <input name="price" type="number" min="0" step="0.01" required
+                  /></label>
+                  <label
+                    >Variable cost per unit ($)
+                    <input name="variable" type="number" min="0" step="0.01" required
+                  /></label>
+                  <button type="submit" class="button button-primary">Find break-even</button>
+                  <output class="calculator-result" role="status"></output>
+                </form>
+              </section>
             </div>
             <div class="tool-builder-entry" id="tool-builder-entry">
               <button type="button" class="button button-secondary" data-view="builder">
                 Your tools
               </button>
             </div>
+          </section>
+          <section
+            id="finance-view"
+            class="view finance-view"
+            aria-labelledby="finance-view-heading"
+            hidden
+          >
+            <header class="finance-heading">
+              <button type="button" class="back-link" data-view="tools">← Student tools</button>
+              <h1 id="finance-view-heading">Financial calculator</h1>
+            </header>
+            <div
+              id="finance-calculator"
+              class="finance-calculator"
+              aria-label="Financial calculator keypad"
+              tabindex="0"
+              aria-busy="true"
+            >
+              <div class="finance-screen">
+                <p id="finance-flags" class="finance-flags" aria-label="Calculator indicators"></p>
+                <div class="finance-readout">
+                  <span id="finance-label"></span>
+                  <output id="finance-output" aria-live="polite" aria-atomic="true">0.00</output>
+                </div>
+              </div>
+              <div
+                id="finance-keypad"
+                class="finance-keypad"
+                role="group"
+                aria-label="Calculator keys"
+              ></div>
+              <p id="finance-load-status" role="status"></p>
+            </div>
+            <details class="finance-help">
+              <summary>Key help</summary>
+              <p>
+                Press <kbd>2nd</kbd> for the label above a key. Use <kbd>↑</kbd> and <kbd>↓</kbd> to
+                move through a worksheet, <kbd>ENTER</kbd> to save a value, and <kbd>CPT</kbd> to
+                solve it.
+              </p>
+              <p>
+                For future value, enter a value and press its key, such as <kbd>N</kbd> or
+                <kbd>PV</kbd>. Use a negative present value for money invested, then press
+                <kbd>CPT</kbd> <kbd>FV</kbd>.
+              </p>
+              <a
+                class="inline-link"
+                href="https://education.ti.com/en/guidebook/details/en/ADF11FB65B284B6195B0A7E9502784BA/baii"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Texas Instruments guidebook</a
+              >
+            </details>
           </section>
           <section id="memory-view" class="view" aria-label="Conversations and memory" hidden>
             <div id="memory-content"></div>

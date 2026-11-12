@@ -8,15 +8,16 @@
       "sha256": "0f8a3fb971ae4fc8695e1ff20487799e89dd927d90e652e21ea5b1ef22149ca9",
       "dependencyLockSha256": "ba0cc463d8cf741c9bfc6a9f5182fb6633fa95cf1819b23a15947a387c731075"
     },
-    "fingerprint": "06cdc63ac5c788a6756fa90d2d24b6f124e2e78717ce0bfd5640360dff584055",
+    "fingerprint": "36e797414dc1be05d67493654a8e8c5c9da186ea52ac4d986ef0667bec179a54",
     "modules": [
       {
         "file": "src/client/api.mjs",
-        "sha256": "87c8971a8ae50044176b2bb6295208f2ec99c45f11b3170931ecac496ce5f5a2",
+        "sha256": "99a2911c32e573fd30089dbf6ed5ea47e367e7e692dd065174c5cb3e8fa5e746",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
           "src/client/app.mjs",
+          "src/client/study-ui.mjs",
           "src/client/syllabus-ui.mjs"
         ],
         "dependencies": [],
@@ -37,7 +38,7 @@
       },
       {
         "file": "src/client/app.mjs",
-        "sha256": "1a107ca51b810a459c840db2deaa06425804baa6c06bc12d1097a9a4fa99365d",
+        "sha256": "5b01af085970746893306b75c6bb0c42d887b5d717bca2869b76b9a5cdf0f650",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/api.mjs",
@@ -50,6 +51,7 @@
           "src/client/customization-drawer.mjs",
           "src/client/customization.mjs",
           "src/client/documents.mjs",
+          "src/client/financial-calculator-ui.mjs",
           "src/client/homework-planner.mjs",
           "src/client/memory-ui.mjs",
           "src/client/pdf-workspace.mjs",
@@ -203,6 +205,20 @@
             "locationStatus": "located"
           },
           {
+            "to": "src/client/financial-calculator-ui.mjs",
+            "specifier": "/client/financial-calculator-ui.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "/client/financial-calculator-ui.mjs",
+                "line": 307,
+                "column": 22,
+                "syntax": "dynamic-import"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
             "to": "src/client/homework-planner.mjs",
             "specifier": "/client/homework-planner.mjs",
             "kind": "source import; not runtime data flow",
@@ -251,7 +267,7 @@
             "locations": [
               {
                 "specifier": "/client/reading-library.mjs",
-                "line": 916,
+                "line": 939,
                 "column": 46,
                 "syntax": "dynamic-import"
               }
@@ -321,7 +337,7 @@
             "locations": [
               {
                 "specifier": "/client/student-tools.mjs",
-                "line": 930,
+                "line": 953,
                 "column": 8,
                 "syntax": "dynamic-import"
               }
@@ -370,7 +386,7 @@
       },
       {
         "file": "src/client/canvas-ui.mjs",
-        "sha256": "da67756e0711e6ce4c75a3595e90f909e25e752d65277f1b5a67e2a2cfb7bb3c",
+        "sha256": "f5dbafed4f308a81dc34dd3d20381dd3e843fb579a80a605c93b66754aee7388",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/canvas-display.mjs",
@@ -487,7 +503,7 @@
       },
       {
         "file": "src/client/connections-ui.mjs",
-        "sha256": "b966c07a34691ae28db98fce931f828f76d2aabeefc52e34cab4113ac03173b2",
+        "sha256": "0df207f3629a10ac14402ef75fac60eac6293e4d3c75ffd994df0297b260b27f",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -586,6 +602,103 @@
             "resolution": "outside this source map; not traversed"
           }
         ],
+        "dynamicImports": []
+      },
+      {
+        "file": "src/client/financial-calculator-ui.mjs",
+        "sha256": "9cb8543ba5474547999701f34889bf4d431a2633c9d00a1274a05827652c00f7",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [
+          "src/client/financial-calculator.mjs"
+        ],
+        "importedBy": [
+          "src/client/app.mjs"
+        ],
+        "dependencies": [
+          {
+            "to": "src/client/financial-calculator.mjs",
+            "specifier": "./financial-calculator.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./financial-calculator.mjs",
+                "line": 1,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          }
+        ],
+        "otherImports": [],
+        "dynamicImports": []
+      },
+      {
+        "file": "src/client/financial-calculator.mjs",
+        "sha256": "78b8dd35ed1a065f383692b8c5b36458e6ec7ce914368137a5c8fe1df8679dbc",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [
+          "src/client/financial-math.mjs",
+          "src/client/financial-worksheets.mjs"
+        ],
+        "importedBy": [
+          "src/client/financial-calculator-ui.mjs"
+        ],
+        "dependencies": [
+          {
+            "to": "src/client/financial-math.mjs",
+            "specifier": "./financial-math.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./financial-math.mjs",
+                "line": 1,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
+            "to": "src/client/financial-worksheets.mjs",
+            "specifier": "./financial-worksheets.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./financial-worksheets.mjs",
+                "line": 2,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          }
+        ],
+        "otherImports": [],
+        "dynamicImports": []
+      },
+      {
+        "file": "src/client/financial-math.mjs",
+        "sha256": "a4db4c81194c22ff39f1fdd3ebca8fe2b49d9eacc03291d66f09d5f1c1e4efc2",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [],
+        "importedBy": [
+          "src/client/financial-calculator.mjs"
+        ],
+        "dependencies": [],
+        "otherImports": [],
+        "dynamicImports": []
+      },
+      {
+        "file": "src/client/financial-worksheets.mjs",
+        "sha256": "89de8645adf6aa94163e0f43c2ae02352d37d15a8351d3858be34caceb0d7c21",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [],
+        "importedBy": [
+          "src/client/financial-calculator.mjs"
+        ],
+        "dependencies": [],
+        "otherImports": [],
         "dynamicImports": []
       },
       {
@@ -694,7 +807,7 @@
       },
       {
         "file": "src/client/resources-ui.mjs",
-        "sha256": "2b630f09367824baee2c728e8ed3413b901493c1640ae5f105ac297f16829553",
+        "sha256": "aa54970a7f77ec6e694eaa156a1655138a45878bf151be7ef7628806d8d2580f",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -742,7 +855,7 @@
       },
       {
         "file": "src/client/student-tools.mjs",
-        "sha256": "3675bea8d9be90eeac0d19860ee730953ccc2ee576e8c41a10fd9db615071df6",
+        "sha256": "007cf19702341868f79b5ad4c25a78fded762cf5c5bf2454e3e6dcf38e933b30",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -754,9 +867,10 @@
       },
       {
         "file": "src/client/study-ui.mjs",
-        "sha256": "817b9578e80e1725656bd65bd28db83fa033530af54cb1db7260220a2f45b392",
+        "sha256": "cc933e659e7305ade56f49e7e8fa766b5e9dcd0ead64ee939993830f34b50c27",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
+          "src/client/api.mjs",
           "src/client/documents.mjs",
           "src/client/loading-ui.mjs",
           "src/client/syllabus-ui.mjs"
@@ -766,6 +880,20 @@
           "src/client/course-study-ui.mjs"
         ],
         "dependencies": [
+          {
+            "to": "src/client/api.mjs",
+            "specifier": "/client/api.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "/client/api.mjs",
+                "line": 2,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
           {
             "to": "src/client/documents.mjs",
             "specifier": "/client/documents.mjs",
@@ -787,7 +915,7 @@
             "locations": [
               {
                 "specifier": "/client/loading-ui.mjs",
-                "line": 2,
+                "line": 3,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -801,7 +929,7 @@
             "locations": [
               {
                 "specifier": "/client/syllabus-ui.mjs",
-                "line": 3,
+                "line": 4,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -826,7 +954,7 @@
       },
       {
         "file": "src/client/syllabus-ui.mjs",
-        "sha256": "3a7d9b5906347e83aeb0b4a070b6af8e679673134c400975f77f2b84221e6ed6",
+        "sha256": "4ba194ca4c8cf5e519f00081adc2dcb89811d01eddd136be59641feb0fd544ae",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/api.mjs",
@@ -1011,11 +1139,13 @@
       },
       {
         "file": "src/server/app-preview.mjs",
-        "sha256": "96094f5f3d280e6b7ef2eb489d7b7d3211c200aa9e989467852ef37c08b8c24a",
+        "sha256": "e9fadf0498a203e174dc660f8edc25468d4b5e1822e935807cd88327a71d9db1",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/demo-answers.mjs",
-          "src/server/security.mjs"
+          "src/server/python-domain.mjs",
+          "src/server/security.mjs",
+          "src/server/study.mjs"
         ],
         "importedBy": [
           "src/server/app-changes.mjs",
@@ -1037,6 +1167,20 @@
             "locationStatus": "located"
           },
           {
+            "to": "src/server/python-domain.mjs",
+            "specifier": "./python-domain.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./python-domain.mjs",
+                "line": 7,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
             "to": "src/server/security.mjs",
             "specifier": "./security.mjs",
             "kind": "source import; not runtime data flow",
@@ -1044,6 +1188,20 @@
               {
                 "specifier": "./security.mjs",
                 "line": 5,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
+            "to": "src/server/study.mjs",
+            "specifier": "./study.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./study.mjs",
+                "line": 6,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1196,6 +1354,59 @@
         "dynamicImports": []
       },
       {
+        "file": "src/server/canvas-oauth.mjs",
+        "sha256": "6b742dd935ddfb928d9cf390fd4f7dbf2f60741ee66538ce3fdd4fbbf230a01c",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [
+          "src/server/canvas.mjs",
+          "src/server/security.mjs"
+        ],
+        "importedBy": [
+          "src/server/http.mjs",
+          "src/server/index.mjs"
+        ],
+        "dependencies": [
+          {
+            "to": "src/server/canvas.mjs",
+            "specifier": "./canvas.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./canvas.mjs",
+                "line": 2,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
+            "to": "src/server/security.mjs",
+            "specifier": "./security.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./security.mjs",
+                "line": 3,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          }
+        ],
+        "otherImports": [
+          {
+            "specifier": "node:crypto",
+            "line": 1,
+            "column": 1,
+            "syntax": "ImportDeclaration",
+            "resolution": "outside this source map; not traversed"
+          }
+        ],
+        "dynamicImports": []
+      },
+      {
         "file": "src/server/canvas.mjs",
         "sha256": "b719c26a760ea9ef842a5295184daea96fe326ba55288627e110b310ffdfd053",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
@@ -1204,6 +1415,7 @@
           "src/server/python-domain.mjs"
         ],
         "importedBy": [
+          "src/server/canvas-oauth.mjs",
           "src/server/http.mjs"
         ],
         "dependencies": [
@@ -1443,7 +1655,7 @@
       },
       {
         "file": "src/server/http.mjs",
-        "sha256": "f4084add7acd4bb1ac0e809be37606093d584d93867369d23508d76686bd66fb",
+        "sha256": "e8b90aef0eda22e8b23d5ebec40695da2e4e658466adfcc060dba8d060df112c",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/server/app-changes.mjs",
@@ -1451,10 +1663,12 @@
           "src/server/app-recovery.mjs",
           "src/server/appearance-builder.mjs",
           "src/server/builder.mjs",
+          "src/server/canvas-oauth.mjs",
           "src/server/canvas.mjs",
           "src/server/connections.mjs",
           "src/server/course-export.mjs",
           "src/server/document-processing.mjs",
+          "src/server/masked-canvas.mjs",
           "src/server/memory.mjs",
           "src/server/narration.mjs",
           "src/server/python-domain.mjs",
@@ -1489,7 +1703,7 @@
             "locations": [
               {
                 "specifier": "./app-preview.mjs",
-                "line": 24,
+                "line": 26,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1503,7 +1717,7 @@
             "locations": [
               {
                 "specifier": "./app-recovery.mjs",
-                "line": 25,
+                "line": 27,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1517,7 +1731,7 @@
             "locations": [
               {
                 "specifier": "./appearance-builder.mjs",
-                "line": 26,
+                "line": 28,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1532,6 +1746,20 @@
               {
                 "specifier": "./builder.mjs",
                 "line": 22,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
+            "to": "src/server/canvas-oauth.mjs",
+            "specifier": "./canvas-oauth.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./canvas-oauth.mjs",
+                "line": 25,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1573,7 +1801,7 @@
             "locations": [
               {
                 "specifier": "./course-export.mjs",
-                "line": 29,
+                "line": 31,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1595,13 +1823,27 @@
             "locationStatus": "located"
           },
           {
+            "to": "src/server/masked-canvas.mjs",
+            "specifier": "./masked-canvas.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./masked-canvas.mjs",
+                "line": 24,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
+          {
             "to": "src/server/memory.mjs",
             "specifier": "./memory.mjs",
             "kind": "source import; not runtime data flow",
             "locations": [
               {
                 "specifier": "./memory.mjs",
-                "line": 28,
+                "line": 30,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1699,7 +1941,7 @@
             "locations": [
               {
                 "specifier": "./web-resources.mjs",
-                "line": 27,
+                "line": 29,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1741,15 +1983,30 @@
       },
       {
         "file": "src/server/index.mjs",
-        "sha256": "9b796257feb5a30399d6b3fc8580f069cb4eccdd75adadd230630e7c705d0115",
+        "sha256": "f8c54bd8db1aaba8fd0300e473cbf6a79ffdb0000de7abf5de23a5438bb7d2d3",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
+          "src/server/canvas-oauth.mjs",
           "src/server/http.mjs",
           "src/server/memory.mjs",
           "src/server/owner-canvas.mjs"
         ],
         "importedBy": [],
         "dependencies": [
+          {
+            "to": "src/server/canvas-oauth.mjs",
+            "specifier": "./canvas-oauth.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./canvas-oauth.mjs",
+                "line": 4,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
           {
             "to": "src/server/http.mjs",
             "specifier": "./http.mjs",
@@ -1786,6 +2043,35 @@
               {
                 "specifier": "./owner-canvas.mjs",
                 "line": 3,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          }
+        ],
+        "otherImports": [],
+        "dynamicImports": []
+      },
+      {
+        "file": "src/server/masked-canvas.mjs",
+        "sha256": "cf70345c626ff352812bb937352f3b8fca47ea9b3e3a8c18effd8a6880ddeab3",
+        "locationParser": "ESLint built-in parser; no source config or rules loaded",
+        "imports": [
+          "src/server/security.mjs"
+        ],
+        "importedBy": [
+          "src/server/http.mjs"
+        ],
+        "dependencies": [
+          {
+            "to": "src/server/security.mjs",
+            "specifier": "./security.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./security.mjs",
+                "line": 1,
                 "column": 1,
                 "syntax": "ImportDeclaration"
               }
@@ -1974,6 +2260,7 @@
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
+          "src/server/app-preview.mjs",
           "src/server/canvas.mjs",
           "src/server/http.mjs",
           "src/server/retrieval.mjs",
@@ -2093,8 +2380,10 @@
           "src/server/app-preview.mjs",
           "src/server/appearance-builder.mjs",
           "src/server/builder.mjs",
+          "src/server/canvas-oauth.mjs",
           "src/server/course-export.mjs",
           "src/server/http.mjs",
+          "src/server/masked-canvas.mjs",
           "src/server/memory.mjs",
           "src/server/narration.mjs",
           "src/server/submissions.mjs",
@@ -2122,6 +2411,7 @@
           "src/server/python-domain.mjs"
         ],
         "importedBy": [
+          "src/server/app-preview.mjs",
           "src/server/http.mjs"
         ],
         "dependencies": [
@@ -2255,11 +2545,11 @@
     ]
   },
   "coverage": "JavaScript/TypeScript and Python static imports plus verified worker declarations; no runtime data lineage or provider reachability claim.",
-  "fingerprint": "d633fa7fd35b79accd4d0111c4f1b60e148a3ed93d41c9dce182610aa05e7fd4",
+  "fingerprint": "86a6ad5200409356229c4cb131a4f232404b2f3b76c69a82ff8271c6d3e9ad7b",
   "sources": [
     {
       "path": "src/client/api.mjs",
-      "sha256": "87c8971a8ae50044176b2bb6295208f2ec99c45f11b3170931ecac496ce5f5a2"
+      "sha256": "99a2911c32e573fd30089dbf6ed5ea47e367e7e692dd065174c5cb3e8fa5e746"
     },
     {
       "path": "src/client/app-changes-ui.mjs",
@@ -2267,7 +2557,7 @@
     },
     {
       "path": "src/client/app.mjs",
-      "sha256": "1a107ca51b810a459c840db2deaa06425804baa6c06bc12d1097a9a4fa99365d"
+      "sha256": "5b01af085970746893306b75c6bb0c42d887b5d717bca2869b76b9a5cdf0f650"
     },
     {
       "path": "src/client/appearance-preview.mjs",
@@ -2283,7 +2573,7 @@
     },
     {
       "path": "src/client/canvas-ui.mjs",
-      "sha256": "da67756e0711e6ce4c75a3595e90f909e25e752d65277f1b5a67e2a2cfb7bb3c"
+      "sha256": "f5dbafed4f308a81dc34dd3d20381dd3e843fb579a80a605c93b66754aee7388"
     },
     {
       "path": "src/client/chat-format.mjs",
@@ -2291,7 +2581,7 @@
     },
     {
       "path": "src/client/connections-ui.mjs",
-      "sha256": "b966c07a34691ae28db98fce931f828f76d2aabeefc52e34cab4113ac03173b2"
+      "sha256": "0df207f3629a10ac14402ef75fac60eac6293e4d3c75ffd994df0297b260b27f"
     },
     {
       "path": "src/client/course-study-ui.mjs",
@@ -2308,6 +2598,22 @@
     {
       "path": "src/client/documents.mjs",
       "sha256": "a9efd94b70cd35274744d5ce1df49c31622d69be1f81a1b71f92bca737c1872b"
+    },
+    {
+      "path": "src/client/financial-calculator-ui.mjs",
+      "sha256": "9cb8543ba5474547999701f34889bf4d431a2633c9d00a1274a05827652c00f7"
+    },
+    {
+      "path": "src/client/financial-calculator.mjs",
+      "sha256": "78b8dd35ed1a065f383692b8c5b36458e6ec7ce914368137a5c8fe1df8679dbc"
+    },
+    {
+      "path": "src/client/financial-math.mjs",
+      "sha256": "a4db4c81194c22ff39f1fdd3ebca8fe2b49d9eacc03291d66f09d5f1c1e4efc2"
+    },
+    {
+      "path": "src/client/financial-worksheets.mjs",
+      "sha256": "89de8645adf6aa94163e0f43c2ae02352d37d15a8351d3858be34caceb0d7c21"
     },
     {
       "path": "src/client/homework-planner.mjs",
@@ -2331,7 +2637,7 @@
     },
     {
       "path": "src/client/resources-ui.mjs",
-      "sha256": "2b630f09367824baee2c728e8ed3413b901493c1640ae5f105ac297f16829553"
+      "sha256": "aa54970a7f77ec6e694eaa156a1655138a45878bf151be7ef7628806d8d2580f"
     },
     {
       "path": "src/client/roger-navigation.mjs",
@@ -2347,11 +2653,11 @@
     },
     {
       "path": "src/client/student-tools.mjs",
-      "sha256": "3675bea8d9be90eeac0d19860ee730953ccc2ee576e8c41a10fd9db615071df6"
+      "sha256": "007cf19702341868f79b5ad4c25a78fded762cf5c5bf2454e3e6dcf38e933b30"
     },
     {
       "path": "src/client/study-ui.mjs",
-      "sha256": "817b9578e80e1725656bd65bd28db83fa033530af54cb1db7260220a2f45b392"
+      "sha256": "cc933e659e7305ade56f49e7e8fa766b5e9dcd0ead64ee939993830f34b50c27"
     },
     {
       "path": "src/client/submission-ui.mjs",
@@ -2359,7 +2665,7 @@
     },
     {
       "path": "src/client/syllabus-ui.mjs",
-      "sha256": "3a7d9b5906347e83aeb0b4a070b6af8e679673134c400975f77f2b84221e6ed6"
+      "sha256": "4ba194ca4c8cf5e519f00081adc2dcb89811d01eddd136be59641feb0fd544ae"
     },
     {
       "path": "src/core/cli-protocol.ts",
@@ -2415,7 +2721,7 @@
     },
     {
       "path": "src/server/app-preview.mjs",
-      "sha256": "96094f5f3d280e6b7ef2eb489d7b7d3211c200aa9e989467852ef37c08b8c24a"
+      "sha256": "e9fadf0498a203e174dc660f8edc25468d4b5e1822e935807cd88327a71d9db1"
     },
     {
       "path": "src/server/app-recovery.mjs",
@@ -2432,6 +2738,10 @@
     {
       "path": "src/server/canvas-download.mjs",
       "sha256": "ca7bbf0fbbbf3755d6ea7d7beccd2fdee33c4d683ee1ed2e946472d04bbc6d44"
+    },
+    {
+      "path": "src/server/canvas-oauth.mjs",
+      "sha256": "6b742dd935ddfb928d9cf390fd4f7dbf2f60741ee66538ce3fdd4fbbf230a01c"
     },
     {
       "path": "src/server/canvas.mjs",
@@ -2455,11 +2765,15 @@
     },
     {
       "path": "src/server/http.mjs",
-      "sha256": "f4084add7acd4bb1ac0e809be37606093d584d93867369d23508d76686bd66fb"
+      "sha256": "e8b90aef0eda22e8b23d5ebec40695da2e4e658466adfcc060dba8d060df112c"
     },
     {
       "path": "src/server/index.mjs",
-      "sha256": "9b796257feb5a30399d6b3fc8580f069cb4eccdd75adadd230630e7c705d0115"
+      "sha256": "f8c54bd8db1aaba8fd0300e473cbf6a79ffdb0000de7abf5de23a5438bb7d2d3"
+    },
+    {
+      "path": "src/server/masked-canvas.mjs",
+      "sha256": "cf70345c626ff352812bb937352f3b8fca47ea9b3e3a8c18effd8a6880ddeab3"
     },
     {
       "path": "src/server/memory.mjs",
@@ -2516,6 +2830,10 @@
     "src/client/customization-drawer.mjs",
     "src/client/customization.mjs",
     "src/client/documents.mjs",
+    "src/client/financial-calculator-ui.mjs",
+    "src/client/financial-calculator.mjs",
+    "src/client/financial-math.mjs",
+    "src/client/financial-worksheets.mjs",
     "src/client/homework-planner.mjs",
     "src/client/loading-ui.mjs",
     "src/client/memory-ui.mjs",
@@ -2547,6 +2865,7 @@
     "src/server/appearance-builder.mjs",
     "src/server/builder.mjs",
     "src/server/canvas-download.mjs",
+    "src/server/canvas-oauth.mjs",
     "src/server/canvas.mjs",
     "src/server/connections.mjs",
     "src/server/course-export.mjs",
@@ -2554,6 +2873,7 @@
     "src/server/document-processing.mjs",
     "src/server/http.mjs",
     "src/server/index.mjs",
+    "src/server/masked-canvas.mjs",
     "src/server/memory.mjs",
     "src/server/narration.mjs",
     "src/server/owner-canvas.mjs",
@@ -2708,6 +3028,20 @@
     },
     {
       "from": "src/client/app.mjs",
+      "to": "src/client/financial-calculator-ui.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "/client/financial-calculator-ui.mjs",
+          "line": 307,
+          "column": 22,
+          "syntax": "dynamic-import"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/app.mjs",
       "to": "src/client/homework-planner.mjs",
       "kind": "js-import",
       "locations": [
@@ -2755,7 +3089,7 @@
       "locations": [
         {
           "specifier": "/client/reading-library.mjs",
-          "line": 916,
+          "line": 939,
           "column": 46,
           "syntax": "dynamic-import"
         }
@@ -2825,7 +3159,7 @@
       "locations": [
         {
           "specifier": "/client/student-tools.mjs",
-          "line": 930,
+          "line": 953,
           "column": 8,
           "syntax": "dynamic-import"
         }
@@ -2945,6 +3279,48 @@
       "locationStatus": "located"
     },
     {
+      "from": "src/client/financial-calculator-ui.mjs",
+      "to": "src/client/financial-calculator.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./financial-calculator.mjs",
+          "line": 1,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/financial-calculator.mjs",
+      "to": "src/client/financial-math.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./financial-math.mjs",
+          "line": 1,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/financial-calculator.mjs",
+      "to": "src/client/financial-worksheets.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./financial-worksheets.mjs",
+          "line": 2,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
       "from": "src/client/memory-ui.mjs",
       "to": "src/client/chat-format.mjs",
       "kind": "js-import",
@@ -2974,6 +3350,20 @@
     },
     {
       "from": "src/client/study-ui.mjs",
+      "to": "src/client/api.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "/client/api.mjs",
+          "line": 2,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/client/study-ui.mjs",
       "to": "src/client/documents.mjs",
       "kind": "js-import",
       "locations": [
@@ -2993,7 +3383,7 @@
       "locations": [
         {
           "specifier": "/client/loading-ui.mjs",
-          "line": 2,
+          "line": 3,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3007,7 +3397,7 @@
       "locations": [
         {
           "specifier": "/client/syllabus-ui.mjs",
-          "line": 3,
+          "line": 4,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3191,12 +3581,40 @@
     },
     {
       "from": "src/server/app-preview.mjs",
+      "to": "src/server/python-domain.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./python-domain.mjs",
+          "line": 7,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/app-preview.mjs",
       "to": "src/server/security.mjs",
       "kind": "js-import",
       "locations": [
         {
           "specifier": "./security.mjs",
           "line": 5,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/app-preview.mjs",
+      "to": "src/server/study.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./study.mjs",
+          "line": 6,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3225,6 +3643,34 @@
         {
           "specifier": "./security.mjs",
           "line": 6,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/canvas-oauth.mjs",
+      "to": "src/server/canvas.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./canvas.mjs",
+          "line": 2,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/canvas-oauth.mjs",
+      "to": "src/server/security.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./security.mjs",
+          "line": 3,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3350,7 +3796,7 @@
       "locations": [
         {
           "specifier": "./app-preview.mjs",
-          "line": 24,
+          "line": 26,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3364,7 +3810,7 @@
       "locations": [
         {
           "specifier": "./app-recovery.mjs",
-          "line": 25,
+          "line": 27,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3378,7 +3824,7 @@
       "locations": [
         {
           "specifier": "./appearance-builder.mjs",
-          "line": 26,
+          "line": 28,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3393,6 +3839,20 @@
         {
           "specifier": "./builder.mjs",
           "line": 22,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/http.mjs",
+      "to": "src/server/canvas-oauth.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./canvas-oauth.mjs",
+          "line": 25,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3434,7 +3894,7 @@
       "locations": [
         {
           "specifier": "./course-export.mjs",
-          "line": 29,
+          "line": 31,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3457,12 +3917,26 @@
     },
     {
       "from": "src/server/http.mjs",
+      "to": "src/server/masked-canvas.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./masked-canvas.mjs",
+          "line": 24,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/http.mjs",
       "to": "src/server/memory.mjs",
       "kind": "js-import",
       "locations": [
         {
           "specifier": "./memory.mjs",
-          "line": 28,
+          "line": 30,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3560,7 +4034,21 @@
       "locations": [
         {
           "specifier": "./web-resources.mjs",
-          "line": 27,
+          "line": 29,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/index.mjs",
+      "to": "src/server/canvas-oauth.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./canvas-oauth.mjs",
+          "line": 4,
           "column": 1,
           "syntax": "ImportDeclaration"
         }
@@ -3603,6 +4091,20 @@
         {
           "specifier": "./owner-canvas.mjs",
           "line": 3,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/masked-canvas.mjs",
+      "to": "src/server/security.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./security.mjs",
+          "line": 1,
           "column": 1,
           "syntax": "ImportDeclaration"
         }

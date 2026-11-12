@@ -26,6 +26,15 @@ const newsLogos = {
   'SEC EDGAR': 'news-sec.png',
   FRED: 'news-fred.png',
 };
+const researchStickers = {
+  'The Washington Post': ['WP', 'press'],
+  'Boston Business Journal': ['BBJ', 'business'],
+  'The Boston Globe': ['BG', 'press'],
+  'S&P Capital IQ': ['S&P', 'business'],
+  Mintel: ['M', 'market'],
+  IBISWorld: ['IBIS', 'market'],
+  'Euromonitor Passport': ['EP', 'market'],
+};
 
 function newsTitle(title, url) {
   const heading = el('h4');
@@ -42,6 +51,12 @@ function newsTitle(title, url) {
     logo.addEventListener('error', () => logo.remove(), { once: true });
     logo.src = `/assets/${filename}`;
     titleLink.prepend(logo);
+  } else if (researchStickers[title]) {
+    const [mark, color] = researchStickers[title];
+    const sticker = el('span', mark, 'news-logo research-sticker');
+    sticker.dataset.color = color;
+    sticker.setAttribute('aria-hidden', 'true');
+    titleLink.prepend(sticker);
   }
   heading.append(titleLink);
   return heading;
@@ -55,6 +70,20 @@ const newsGroups = [
       ['NPR', 'https://www.npr.org/', 'Public radio, articles, and podcasts'],
       ['The New York Times', 'https://www.nytimes.com/', 'News, analysis, and culture'],
       ['Reuters', 'https://www.reuters.com/', 'World news and business reporting'],
+      [
+        'The Washington Post',
+        'https://www.washingtonpost.com/',
+        'National reporting and policy',
+        'Babson registration',
+        'https://libguides.babson.edu/news',
+      ],
+      [
+        'The Boston Globe',
+        'https://www.bostonglobe.com/',
+        'Boston and New England news',
+        'Read through Horn Library',
+        'https://libguides.babson.edu/newssources/bostonglobe',
+      ],
     ],
   ],
   [
@@ -92,6 +121,46 @@ const newsGroups = [
       ],
       ['SEC EDGAR', 'https://www.sec.gov/edgar/search/', 'Public company filings'],
       ['FRED', 'https://fred.stlouisfed.org/', 'Economic data and charts'],
+      [
+        'Boston Business Journal',
+        'https://www.bizjournals.com/boston/',
+        'Greater Boston companies and deals',
+        'Babson registration',
+        'https://libguides.babson.edu/news',
+      ],
+    ],
+  ],
+  [
+    'Company, industry and consumer research',
+    [
+      [
+        'S&P Capital IQ',
+        'https://www.spglobal.com/marketintelligence/en/solutions/sp-capital-iq-pro',
+        'Company financials, comparable companies, and analyst research',
+        'Babson access',
+        'https://libguides.babson.edu/contentstrategy/CompanyCollection',
+      ],
+      [
+        'Mintel',
+        'https://www.mintel.com/',
+        'Consumer behavior and product category reports. Use on the publisher site.',
+        'Babson access',
+        'https://libguides.babson.edu/consulting/industry',
+      ],
+      [
+        'IBISWorld',
+        'https://www.ibisworld.com/',
+        'Industry size, trends, and competitive conditions',
+        'Babson access',
+        'https://libguides.babson.edu/consulting/industry',
+      ],
+      [
+        'Euromonitor Passport',
+        'https://www.euromonitor.com/our-expertise/passport',
+        'Global consumer markets and country comparisons',
+        'Babson access',
+        'https://libguides.babson.edu/DTOF/industries',
+      ],
     ],
   ],
 ];

@@ -253,6 +253,7 @@ function stop() {
   $('pause-button').textContent = 'Pause';
 }
 let navigationTouched = false;
+let financeReady;
 function view(name, { automatic = false, load = true, overview = false, keepAnswer = false } = {}) {
   if (name === 'customize') {
     customizationDrawer.open();
@@ -280,6 +281,7 @@ function view(name, { automatic = false, load = true, overview = false, keepAnsw
     'resources',
     'research',
     'tools',
+    'finance',
     'memory',
   ])
     $(`${candidate}-view`).hidden = candidate !== name;
@@ -298,6 +300,27 @@ function view(name, { automatic = false, load = true, overview = false, keepAnsw
   if (name === 'planner') homeworkPlanner.render();
   if (name === 'resources') resourcesUI.render();
   if (name === 'research') renderNewsDirectory($('research-content'));
+  if (name === 'finance') {
+    const root = $('finance-calculator');
+    window.scrollTo(0, 0);
+    root.focus({ preventScroll: true });
+    financeReady ??= import('/client/financial-calculator-ui.mjs').then(
+      ({ mountFinancialCalculator }) => {
+        mountFinancialCalculator({
+          root,
+          keypad: $('finance-keypad'),
+          output: $('finance-output'),
+          label: $('finance-label'),
+          flags: $('finance-flags'),
+        });
+        root.setAttribute('aria-busy', 'false');
+      },
+      () => {
+        root.setAttribute('aria-busy', 'false');
+        $('finance-load-status').textContent = 'Restart Roger to load the financial calculator.';
+      },
+    );
+  }
   if (name === 'memory') return memoryUI.render();
   if (name === 'builder') void builderUI.render();
   if (name === 'app-changes') void appChangesUI.render();
@@ -501,8 +524,8 @@ function renderPage() {
   selectionControls(false);
   $('document-title').textContent = doc.title;
   const sourceLink = $('document-canvas-source');
-  sourceLink.hidden = !doc.source;
-  if (doc.source) sourceLink.href = doc.source.url;
+  sourceLink.hidden = !doc.source?.url;
+  if (doc.source?.url) sourceLink.href = doc.source.url;
   else sourceLink.removeAttribute('href');
   $('document-meta').textContent =
     `${doc.isPdf ? 'PDF' : doc.kind === 'pptx' ? 'PowerPoint · text only' : 'Text document'} · ${doc.pages.length} ${doc.kind === 'pptx' ? 'slides' : doc.isPdf ? (doc.pages.length === 1 ? 'page' : 'pages') : doc.pages.length === 1 ? 'section' : 'sections'}`;
@@ -548,7 +571,7 @@ async function importFile(
   file,
   { signal, initialPage, source, ocr = [], open = true, saveLocally = false } = {},
 ) {
-  if (state.importing) return;
+  if (state.importing || (state.recording && !source)) return;
   state.importing = true;
   const controller = new AbortController();
   state.importController = controller;
@@ -698,7 +721,7 @@ function renderEvidence(passages, target = $('sources-list'), openSource) {
       openDocument(passage.documentId, (index ?? -1) + 1);
     });
     article.append(button);
-    if (doc?.source) {
+    if (doc?.source?.url) {
       const source = node('a', 'Canvas source', 'inline-link');
       source.href = doc.source.url;
       source.target = '_blank';
@@ -930,10 +953,14 @@ async function start() {
   void import('/client/student-tools.mjs')
     .then(({ mountStudentTools }) =>
       mountStudentTools({
-        finance: $('finance-calculator'),
         grades: $('weighted-calculator'),
         items: $('grade-items'),
         add: $('add-grade-item'),
+        gpa: $('gpa-calculator'),
+        gpaCourses: $('gpa-courses'),
+        addGpaCourse: $('add-gpa-course'),
+        target: $('target-calculator'),
+        breakEven: $('break-even-calculator'),
       }),
     )
     .catch(() => {
@@ -1638,10 +1665,61 @@ async function start() {
     $('roger-ai').hidden = true;
     $('roger-message').placeholder = 'Ask about a demo course…';
     $('tool-builder-entry').hidden = true;
+    $('upload-button').hidden = true;
+    $('upload-inline').hidden = true;
+    $('canvas-setup-settings').querySelector('a')?.remove();
+  }
+  const setup = new URLSearchParams(window.location.search);
+  const signIn = $('canvas-sign-in');
+  if (session.canvasSignInAvailable) {
+    signIn.hidden = false;
+    $('canvas-sign-in-help').textContent =
+      'Use Babson’s Canvas sign-in and approve read access. Roger will open your courses when you return.';
+    signIn.addEventListener('click', async () => {
+      signIn.disabled = true;
+      try {
+        const { url } = await api('/api/canvas/oauth/start', { body: {} });
+        window.location.assign(url);
+      } catch (error) {
+        status(error.message);
+        signIn.disabled = false;
+      }
+    });
   }
   const demoSettings = $('demo-settings');
-  if (demoSettings) demoSettings.hidden = !session.recordingAvailable;
+  if (demoSettings) {
+    demoSettings.hidden = !session.recordingAvailable && !session.returnToSettings;
+    const toggle = $('demo-toggle');
+    toggle.setAttribute('aria-checked', String(state.recording));
+    $('demo-help').textContent = state.recording
+      ? 'Turn off to show your private workspace again.'
+      : 'Mask course details and submission statuses while presenting. Connect Canvas to demonstrate live sync.';
+    toggle.addEventListener('click', async () => {
+      if (session.returnToSettings) {
+        toggle.disabled = true;
+        try {
+          await api('/api/demo/exit', { body: {} });
+        } finally {
+          window.location.assign(session.returnToSettings);
+        }
+        return;
+      }
+      toggle.disabled = true;
+      try {
+        const { url } = await api('/api/demo/start', { body: {} });
+        window.location.assign(url);
+      } catch (error) {
+        status(error.message);
+        toggle.disabled = false;
+      }
+    });
+  }
   canvasPanel.restore(session.canvas);
+  if (setup.get('setup') === 'settings' && setup.get('canvas') !== 'connected') {
+    view('settings');
+    if (setup.get('canvas') === 'incomplete')
+      status('Canvas sign-in did not finish. Try again when you are ready.');
+  }
   if (session.canvas && !navigationTouched) {
     view('courses', { automatic: true, load: false });
     await canvasPanel.loadCourses({ reuse: true });

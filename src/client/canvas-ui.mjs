@@ -166,6 +166,7 @@ export function createCanvasPanel({
       .closest('.connection-panel')
       ?.classList.toggle('canvas-connected', state.connected);
     $('canvas-connect').hidden = state.connected;
+    $('canvas-setup-settings').hidden = state.connected;
     $('canvas-disconnect').hidden = !state.connected;
     $('canvas-status').textContent = state.connected
       ? `Connected read-only · ${profile?.name || 'Canvas account'}`
@@ -589,14 +590,22 @@ export function createCanvasPanel({
   async function loadSemesterAssignments({ preserve = false, force = false } = {}) {
     const request = operation();
     const courses = selectedCourses();
-    if (!preserve) assignments = null;
+    const byId = new Map(courses.map((course) => [course.id, course]));
+    const previous = new Map();
+    if (preserve) {
+      for (const item of assignments || []) {
+        const course = byId.get(item.course.id);
+        if (!course) continue;
+        if (!previous.has(course.id)) previous.set(course.id, []);
+        previous.get(course.id).push({ ...item, course });
+      }
+    } else assignments = null;
     assignmentIssue = '';
     loadingAgenda = true;
     renderSemester();
-    const collected = [];
+    const collected = new Map(previous);
     const issues = [];
     try {
-      const byId = new Map(courses.map((course) => [course.id, course]));
       for (let offset = 0; offset < courses.length; offset += 12) {
         const query = new URLSearchParams();
         for (const course of courses.slice(offset, offset + 12))
@@ -608,21 +617,30 @@ export function createCanvasPanel({
         for (const { courseId, assignments: items, issue } of result.courses) {
           const course = byId.get(courseId);
           if (!course) continue;
-          if (issue) issues.push(`${courseCode(course)}: ${issue}`);
-          collected.push(...items.map((item) => ({ ...item, course })));
+          const fresh = items.map((item) => ({ ...item, course }));
+          if (issue) {
+            const freshIds = new Set(fresh.map(({ id }) => id));
+            const retained = (previous.get(courseId) || []).filter(({ id }) => !freshIds.has(id));
+            collected.set(courseId, [...fresh, ...retained]);
+            issues.push(
+              `${courseCode(course)}: ${issue}${retained.length ? ' Showing previous results where needed.' : ''}`,
+            );
+          } else collected.set(courseId, fresh);
         }
       }
-      assignments = collected;
+      assignments = [...collected.values()].flat();
       assignmentsLoadedAt = Date.now();
       assignmentIssue = issues.join(' ');
     } catch (error) {
       if (!request.valid()) return;
-      if (!preserve || collected.length) assignments = collected;
+      assignments = [...collected.values()].flat();
       assignmentIssue = [
         ...issues,
-        preserve ? 'Showing the previous results.' : '',
+        previous.size ? 'Showing previous results where needed.' : '',
         error.message || 'Assignments could not be loaded.',
-      ].join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
     } finally {
       if (request.valid()) {
         loadingAgenda = false;
@@ -635,7 +653,7 @@ export function createCanvasPanel({
     activeCourse = null;
     activeAssignment = null;
     $('course-detail').replaceChildren();
-    if (assignments === null || Date.now() - assignmentsLoadedAt >= 60_000)
+    if (loadingAgenda || assignments === null || Date.now() - assignmentsLoadedAt >= 60_000)
       void loadSemesterAssignments({ preserve: assignments !== null });
     else renderSemester();
     if (focus) $(fullAgenda ? 'semester-assignments' : 'semester-overview').focus();

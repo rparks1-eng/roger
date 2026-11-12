@@ -42,7 +42,7 @@ export function createConnectionsUI({ container, api, onChange = () => {} }) {
       element('h2', 'Choose your AI'),
       element(
         'p',
-        'Connect once for this session, choose a model, then ask Roger to help or build. Your selected provider receives only what you send with a request.',
+        'Choose how to connect, then select a model. Roger uses the selected provider for requests you send.',
       ),
       notice,
     );
@@ -84,6 +84,14 @@ export function createConnectionsUI({ container, api, onChange = () => {} }) {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       card.append(link);
+      if (provider.id === 'anthropic')
+        card.append(
+          element(
+            'p',
+            'Use a Claude Console API key. Claude Code subscription sign-in is for the Claude Code app.',
+            'field-hint',
+          ),
+        );
       if (provider.state === 'connected') {
         const label = element('label', 'Model');
         const select = element('select');
@@ -191,7 +199,7 @@ export function createConnectionsUI({ container, api, onChange = () => {} }) {
     container.append(
       element(
         'p',
-        'Codex uses the official sign-in already available on this computer. Claude, Gemini, Grok and OpenAI API use their provider keys here; Roger does not ask for chat-account passwords. Keys are held in server memory until disconnect, session expiry or server restart.',
+        'Codex opens the official sign-in on this computer. Claude, Gemini, Grok and OpenAI API use provider keys. API keys stay in this session until you disconnect or Roger closes.',
       ),
     );
   }

@@ -3,6 +3,8 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { answerDemo, demoAssignment, demoCourse, demoCourses, demoPages } from './demo-answers.mjs';
 import { assertMutation, HttpError, readJson } from './security.mjs';
+import { createStudySet, retrieveStudyPassages } from './study.mjs';
+import { pythonDomain } from './python-domain.mjs';
 
 const MAX_ASSETS = 128;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -26,11 +28,29 @@ const CSP = [
   "frame-ancestors 'none'",
   'sandbox allow-scripts allow-same-origin',
 ].join('; ');
-function banner(recording) {
-  const label = recording
-    ? 'Demo mode · fictional courses and assignments'
-    : 'Preview · sample courses · changes not applied';
-  return `<aside role="status" aria-label="App preview notice" style="position:fixed;z-index:2147483647;bottom:8px;left:50%;transform:translateX(-50%);padding:10px 18px;border:1px solid #335d48;border-radius:24px;background:#173f32;color:#fff;font:600 12px/1.5 system-ui;max-width:90vw;text-align:center;pointer-events:none">${label}</aside>`;
+function banner(recording, masked) {
+  const label = masked
+    ? 'Demo mode · live Canvas, details masked'
+    : recording
+      ? 'Demo mode · fictional courses and assignments'
+      : 'Preview · sample courses · changes not applied';
+  return {
+    style: `<style>
+      .app-preview-notice {
+        position: fixed; z-index: 2147483647; bottom: 8px; left: 50%;
+        transform: translateX(-50%); padding: 10px 18px; border: 1px solid #335d48;
+        border-radius: 24px; background: #173f32; color: #fff; font: 600 12px/1.5 system-ui;
+        max-width: 90vw; text-align: center; pointer-events: none;
+      }
+      @media (max-width: 760px), (max-width: 1024px) and (max-height: 500px) and (orientation: landscape) {
+        .app-preview-notice {
+          position: absolute; top: env(safe-area-inset-top); bottom: auto; inset-inline: 0;
+          transform: none; max-width: none; padding: 2px 8px; border: 0; border-radius: 0;
+        }
+      }
+    </style>`,
+    notice: `<aside class="app-preview-notice" role="status" aria-label="App preview notice">${label}</aside>`,
+  };
 }
 const equal = (left, right) =>
   typeof left === 'string' &&
@@ -140,6 +160,8 @@ export async function createAppPreview({
   files,
   onOpen = () => {},
   recording = false,
+  maskedCanvas,
+  returnToSettings,
   lifetimeMs = recording ? RECORDING_LIFETIME : MAX_LIFETIME,
 } = {}) {
   const assets = snapshotAssets(files);
@@ -155,12 +177,13 @@ export async function createAppPreview({
   const cookieName = recording ? `${COOKIE_NAME}_demo` : COOKIE_NAME;
   const csrf = randomBytes(24).toString('hex');
   const { courses, assignments, instructions } = sampleData(recording);
-  const notice = banner(recording);
+  const { style, notice } = banner(recording, Boolean(maskedCanvas));
   let origin = '',
     windowStart = Date.now(),
     requests = 0,
     closing,
     expiry;
+  const readTimeout = maskedCanvas ? 30_000 : 9_000;
   const server = createServer({ maxHeaderSize: 16_384 }, async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     // Demo forms can dispatch submit events. The form-action rule still blocks browser navigation.
@@ -193,7 +216,12 @@ export async function createAppPreview({
     }
     if (++requests > 360) return fail(429, 'Preview request limit reached. Reload in a minute.');
     const asking = recording && req.method === 'POST' && url.pathname === '/api/demo/ask';
-    if (!asking && req.method !== 'GET' && req.method !== 'HEAD')
+    const studying =
+      recording &&
+      req.method === 'POST' &&
+      ['/api/study/set', '/api/study/passages', '/api/study/exam-plan'].includes(url.pathname);
+    const exiting = returnToSettings && req.method === 'POST' && url.pathname === '/api/demo/exit';
+    if (!asking && !studying && !exiting && req.method !== 'GET' && req.method !== 'HEAD')
       return fail(
         403,
         'This preview cannot connect accounts, use AI, submit work, or modify files.',
@@ -208,6 +236,35 @@ export async function createAppPreview({
     const entry = url.pathname === '/' && equal(url.searchParams.get('preview'), entryToken);
     if (!entry && !equal(cookie, cookieToken))
       return fail(401, 'Open the current app preview link.');
+    if (exiting) {
+      try {
+        assertMutation(req, { csrf });
+        await readJson(req, 512);
+        setTimeout(() => void close(), 250).unref();
+        return json({ exited: true });
+      } catch {
+        return fail(403, 'Return to Roger from the Demo mode switch.');
+      }
+    }
+    if (studying) {
+      try {
+        assertMutation(req, { csrf });
+        const signal = AbortSignal.timeout(readTimeout);
+        const body = { ...(await readJson(req, 384 * 1024, signal)), engine: 'quick' };
+        const result = url.pathname.endsWith('/exam-plan')
+          ? await pythonDomain('study.exam.plan', body, { signal })
+          : await (url.pathname.endsWith('/passages') ? retrieveStudyPassages : createStudySet)(
+              body,
+              signal,
+            );
+        return json(result);
+      } catch (error) {
+        return fail(
+          error instanceof HttpError ? error.status : 422,
+          'Practice could not be built from the available demo text.',
+        );
+      }
+    }
     if (asking) {
       try {
         assertMutation(req, { csrf });
@@ -218,12 +275,17 @@ export async function createAppPreview({
           !message.trim() ||
           message.length > 2000 ||
           typeof courseId !== 'string' ||
-          !/^[1-4]?$/.test(courseId) ||
+          !(maskedCanvas ? /^\d{0,9}$/ : /^[1-4]?$/).test(courseId) ||
           typeof assignmentId !== 'string' ||
-          !/^(?:[1-4]0[1-4])?$/.test(assignmentId)
+          !(maskedCanvas ? /^\d{0,9}$/ : /^(?:[1-4]0[1-4])?$/).test(assignmentId)
         )
           return fail(400, 'Ask a short question about the demo materials.');
-        return json(answerDemo({ message, courseId, assignmentId }, assignments));
+        const question = { message, courseId, assignmentId };
+        return json(
+          maskedCanvas
+            ? await maskedCanvas.answer(question, AbortSignal.timeout(readTimeout))
+            : answerDemo(question, assignments),
+        );
       } catch (error) {
         return fail(
           error instanceof HttpError ? error.status : 500,
@@ -242,6 +304,9 @@ export async function createAppPreview({
       if (req.method === 'HEAD') return res.end();
       if (url.pathname === '/') {
         let html = asset.bytes.toString('utf8');
+        html = /<\/head\s*>/i.test(html)
+          ? html.replace(/<\/head\s*>/i, style + '</head>')
+          : style + html;
         if (recording)
           html = html.replace(/<title>[^<]*<\/title>/i, '<title>Roger Demo mode</title>');
         if (recording && entry) res.setHeader('Clear-Site-Data', '"storage"');
@@ -263,13 +328,24 @@ export async function createAppPreview({
       res.end();
       return;
     }
+    if (maskedCanvas && url.pathname.startsWith('/api/canvas/')) {
+      try {
+        return json(await maskedCanvas.read(url, AbortSignal.timeout(readTimeout)));
+      } catch (error) {
+        return fail(
+          error instanceof HttpError ? error.status : 502,
+          error instanceof HttpError ? error.message : 'Canvas could not refresh the masked view.',
+        );
+      }
+    }
     const fixed = {
       '/api/session': {
         csrf,
-        canvas: { name: 'Sample student' },
+        canvas: { name: maskedCanvas ? 'Masked Canvas account' : 'Sample student' },
         ephemeral: true,
         preview: true,
         ...(recording ? { recording: true } : {}),
+        ...(returnToSettings ? { returnToSettings } : {}),
       },
       '/api/connections': { selected: null, providers: [] },
       '/api/providers': { providers: [] },
@@ -420,7 +496,7 @@ export async function createAppPreview({
   server.headersTimeout = 5_000;
   server.requestTimeout = 10_000;
   server.keepAliveTimeout = 2_000;
-  server.setTimeout(10_000, (socket) => socket.destroy());
+  server.setTimeout(readTimeout + 1000, (socket) => socket.destroy());
   const close = () => {
     if (closing) return closing;
     clearTimeout(expiry);

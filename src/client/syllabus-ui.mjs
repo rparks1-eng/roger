@@ -11,6 +11,8 @@ const element = (tag, text, className) => {
   return node;
 };
 function sourceLink(source, label) {
+  if (!source.url)
+    return element('span', label === 'Open original in Canvas' ? 'Masked Canvas source' : label);
   const link = element('a', label, 'inline-link');
   const url = new URL(source.url);
   if (url.origin !== 'https://babson.instructure.com' || url.username || url.password)
@@ -28,7 +30,8 @@ function button(label, click) {
 }
 
 async function readSource(source, courseId, api, signal, material = false) {
-  if (source.kind === 'page') return { text: source.text, evidence: source.evidence };
+  if (source.kind === 'page')
+    return { text: source.text, evidence: source.evidence, note: source.note };
   const result = await api(material ? '/api/canvas/study-file' : '/api/canvas/syllabus-file', {
     body: { courseId, fileId: source.fileId },
     binary: true,

@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { setTimeout as wait } from 'node:timers/promises';
 import { createReaderServer } from '../src/server/http.mjs';
+import { createStudySet, retrieveStudyPassages } from '../src/server/study.mjs';
 import { browserOptions, qaScratch } from './quality/scratch.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.READER_PLAYWRIGHT_MODULE || 'playwright');
@@ -100,7 +103,30 @@ const server = createReaderServer({
         modules: [],
       };
     },
-    async readCanvasSyllabus() {
+    async readCanvasSyllabus(_token, id) {
+      if (id === '2')
+        return {
+          candidates: [
+            {
+              kind: 'page',
+              title: 'Private professor syllabus',
+              via: 'Private module',
+              url: 'https://babson.instructure.com/courses/9988/assignments/syllabus',
+              text: 'Private room and grade policy',
+              evidence: {
+                grading: [{ excerpt: 'Private grading formula' }],
+                officeHours: [{ excerpt: 'Private office location' }],
+              },
+            },
+            {
+              kind: 'file',
+              fileId: '993311',
+              title: 'Private filename.pdf',
+              via: 'Private module',
+            },
+          ],
+          coverage: { complete: true, reasons: [] },
+        };
       return { candidates: [], coverage: { complete: true } };
     },
     async listCanvasExportFiles() {
@@ -132,6 +158,8 @@ const server = createReaderServer({
     },
   },
   studyAdapter: {
+    createStudySet,
+    retrieveStudyPassages,
     async providerStatus() {
       return { providers: [] };
     },
@@ -298,6 +326,35 @@ try {
     .filter({ hasText: 'Missing essay 1' })
     .waitFor();
   assert.equal(counts.assignment, 1, 'Warm assignment instructions are reused');
+  await page.getByRole('button', { name: 'Study this', exact: true }).click();
+  const study = page.locator('#assignment-study-slot');
+  const build = study.getByRole('button', { name: 'Build set', exact: true });
+  const notes = study.getByRole('textbox', { name: 'Your notes' });
+  await notes.fill('Compare the assigned reading with evidence from the discussion.');
+  await page.route(
+    '**/api/study/set',
+    async (route) => {
+      await wait(2400);
+      await route.abort('internetdisconnected');
+    },
+    { times: 1 },
+  );
+  await build.click();
+  await study.locator('.loading-shape--practice').waitFor();
+  assert.equal(await build.isEnabled(), false);
+  assert.equal(await study.getByRole('button', { name: 'Cancel', exact: true }).isVisible(), true);
+  await study.screenshot({ path: join(run.work, 'study-loading.png') });
+  await study.getByText('Connection interrupted. Check your connection and try again.').waitFor();
+  assert.equal(await study.locator('.loading-shape--practice').count(), 0);
+  assert.equal(
+    await notes.inputValue(),
+    'Compare the assigned reading with evidence from the discussion.',
+  );
+  await build.click();
+  await study.getByRole('button', { name: 'Show answer', exact: true }).click();
+  await study.getByRole('button', { name: 'Go to instructions', exact: true }).click();
+  assert.equal(await page.locator('#assignment-instructions:focus').count(), 1);
+  await page.getByRole('button', { name: 'Study this', exact: true }).click();
   await page.locator('#customize-toggle').click();
   await page.locator('#customize-drawer').waitFor();
   assert.equal(await page.locator('.canvas-assignment-detail h2').textContent(), 'Missing essay 1');
@@ -313,13 +370,41 @@ try {
     true,
   );
   await page.getByRole('button', { name: '← This Semester', exact: true }).click();
+  // A slow refresh may return successful courses alongside an unavailable one.
+  const agendaApi = '**/api/canvas/assignments?*';
+  await page.route(
+    agendaApi,
+    async (route) => {
+      const response = await route.fetch();
+      const result = await response.json();
+      const unavailable = result.courses.find(({ courseId }) => courseId === '1');
+      unavailable.assignments = [];
+      unavailable.issue = 'Assignments could not be loaded. Try refreshing.';
+      await wait(2400);
+      await route.fulfill({ response, json: result });
+    },
+    { times: 1 },
+  );
+  const upcoming = page.locator('#semester-rows').getByText('Upcoming reading 1');
+  await upcoming.waitFor();
   await page.locator('#semester-refresh').click();
-  await page.locator('#semester-refresh').waitFor({ state: 'visible' });
+  await page.locator('#semester-rows[aria-busy=true]').waitFor();
+  assert.equal(await upcoming.isVisible(), true, 'Keep the last agenda visible while refreshing');
+  await page.screenshot({ path: join(run.work, 'canvas-refresh.png') });
+  await page.locator('#semester-assignment-status').filter({ hasText: 'COURSE101' }).waitFor();
+  assert.equal(await upcoming.isVisible(), true, 'Keep the last results for the affected class');
+  assert.match(
+    await page.locator('#semester-assignment-status').textContent(),
+    /previous results/i,
+  );
   await page.waitForFunction(
     () => !globalThis.document.getElementById('semester-refresh').disabled,
   );
   assert.equal(counts.courses, 2);
   assert.equal(counts.assignments, 2);
+  await page.locator('#semester-refresh').click();
+  await page.locator('#semester-assignment-status').filter({ hasText: 'Updated' }).waitFor();
+  assert.equal(await upcoming.isVisible(), true);
   await page.locator('.canvas-course-card').filter({ hasText: 'AI Development' }).click();
   await page.locator('.canvas-course-header h2').filter({ hasText: 'AI Development' }).waitFor();
   assert.equal(counts.course, 3, 'Explicit refresh also invalidates detail cache');
@@ -553,6 +638,68 @@ try {
   assert.deepEqual(navigation.cleared, []);
   assert.deepEqual(navigation.emptyIndex, { courses: [], assignments: [] });
   await page.evaluate(() => localStorage.setItem('private-workspace-check', 'private-test-value'));
+  await page.route('http://localhost:**/*', (route) => route.continue());
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const maskedStart = { ...counts };
+  await page.getByRole('switch', { name: 'Demo mode' }).click();
+  await page.getByText('Demo mode · live Canvas, details masked').waitFor();
+  await page.locator('#semester-assignment-status').filter({ hasText: 'Updated' }).waitFor();
+  assert.ok(counts.courses > maskedStart.courses);
+  assert.ok(counts.assignments > maskedStart.assignments);
+  assert.equal(await page.evaluate(() => localStorage.getItem('private-workspace-check')), null);
+  await page.locator('.canvas-course-card').filter({ hasText: 'Course 2' }).click();
+  await page.getByRole('button', { name: 'Syllabus', exact: true }).click();
+  await page.getByText('Sample office hours: Tuesdays', { exact: false }).waitFor();
+  assert.doesNotMatch(
+    await page.locator('body').innerText(),
+    /Fixture student|Missing essay|Private professor|Private grading|Private filename/,
+  );
+  const maskedPayloads = await page.evaluate(async () => {
+    const get = async (path) => (await fetch(path)).json();
+    const session = await get('/api/session');
+    const answer = await fetch('/api/demo/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Reader-CSRF': session.csrf },
+      body: JSON.stringify({ message: 'What are Course 2 office hours?', courseId: '2' }),
+    });
+    const blocked = await fetch('/api/canvas/syllabus-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Reader-CSRF': session.csrf },
+      body: JSON.stringify({ courseId: '2', fileId: '993311' }),
+    });
+    return {
+      syllabus: await get('/api/canvas/syllabus?id=2'),
+      assignments: await get('/api/canvas/assignments?courseId=2'),
+      answer: await answer.json(),
+      blocked: blocked.status,
+    };
+  });
+  assert.equal(maskedPayloads.assignments.courses[0].assignments[0].status, 'unsubmitted');
+  assert.equal(maskedPayloads.assignments.courses[0].assignments[1].status, 'submitted');
+  assert.equal(maskedPayloads.syllabus.candidates.length, 2);
+  assert.match(maskedPayloads.syllabus.candidates[1].note, /samples for recording/);
+  assert.match(maskedPayloads.syllabus.candidates[1].evidence.grading[0].excerpt, /Sample grading/);
+  assert.equal(maskedPayloads.answer.passages[0].destination.section, 'syllabus');
+  assert.equal(maskedPayloads.blocked, 403);
+  assert.doesNotMatch(
+    JSON.stringify(maskedPayloads),
+    /Private|babson\.instructure\.com|993311|9988|Missing essay/,
+  );
+  await page.getByRole('button', { name: /^Assignments ·/ }).click();
+  await page.locator('.canvas-course-content .canvas-assignment-row').first().click();
+  await page.getByRole('button', { name: 'Study this', exact: true }).click();
+  const maskedStudy = page.locator('#assignment-study-slot');
+  await maskedStudy.getByRole('button', { name: 'Build set', exact: true }).click();
+  await maskedStudy.getByRole('button', { name: 'Show answer', exact: true }).click();
+  await maskedStudy.getByRole('button', { name: 'Go to instructions', exact: true }).click();
+  assert.equal(await maskedStudy.getByLabel('Add a note file').count(), 0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const demoSwitch = page.getByRole('switch', { name: 'Demo mode' });
+  assert.equal(await demoSwitch.getAttribute('aria-checked'), 'true');
+  await demoSwitch.click();
+  await page.waitForURL(origin + '/?setup=settings');
+  await page.locator('#canvas-status').filter({ hasText: 'Fixture student' }).waitFor();
+  assert.equal(await demoSwitch.getAttribute('aria-checked'), 'false');
   const liveCounts = { ...counts };
   const crossSiteDemo = await page.request.get(origin + '/demo', {
     headers: { 'Sec-Fetch-Site': 'cross-site' },
@@ -569,7 +716,7 @@ try {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const [demo] = await Promise.all([
     context.waitForEvent('page'),
-    page.getByRole('link', { name: 'Open demo mode' }).click(),
+    page.evaluate(() => void globalThis.open('/demo', '_blank', 'noopener')),
   ]);
   demo.on('pageerror', (error) => errors.push(error.message));
   await demo.getByText('Demo mode · fictional courses and assignments').waitFor();
@@ -684,17 +831,16 @@ try {
   await demo.locator('.desk-links [data-view=research]').click();
   await demo.getByRole('heading', { name: 'News & research', exact: true }).waitFor();
   assert.equal(await demo.getByRole('searchbox').isVisible(), false);
-  assert.equal(await demo.locator('#research-content .news-logo').count(), 12);
+  assert.equal(await demo.locator('#research-content .news-logo').count(), 19);
+  for (const title of [
+    'The Washington Post',
+    'Boston Business Journal',
+    'S&P Capital IQ',
+    'Mintel',
+  ])
+    assert.equal(await demo.getByRole('link', { name: title, exact: true }).isVisible(), true);
   await demo.locator('.rail-main [data-view=courses]').click();
   await demo.locator('.desk-links [data-view=tools]').click();
-  const finance = demo.locator('#finance-calculator');
-  await finance.getByRole('button', { name: 'Calculate', exact: true }).click();
-  await finance.locator('output').filter({ hasText: '$1,051.16 after 12 months' }).waitFor();
-  await finance.getByLabel('Calculation').selectOption('loan');
-  await finance.getByLabel('Starting amount ($)').fill('1200');
-  await finance.getByLabel('Annual rate (%)').fill('0');
-  await finance.getByRole('button', { name: 'Calculate', exact: true }).click();
-  await finance.locator('output').filter({ hasText: '$100.00 per month' }).waitFor();
   const grades = demo.locator('#weighted-calculator');
   for (const [name, value] of [
     ['score-1', '80'],
@@ -711,10 +857,93 @@ try {
     .locator('output')
     .filter({ hasText: 'Weights cannot add up to more than 100%' })
     .waitFor();
+  const gpa = demo.locator('#gpa-calculator');
+  await gpa.getByLabel('Letter grade').nth(0).selectOption('4');
+  await gpa.getByLabel('Credits').nth(0).fill('4');
+  await gpa.getByLabel('Letter grade').nth(1).selectOption('3');
+  await gpa.getByLabel('Credits').nth(1).fill('2');
+  await gpa.getByRole('button', { name: 'Calculate GPA' }).click();
+  await gpa.getByText('3.67 estimated GPA across 6 credits.').waitFor();
+  const target = demo.locator('#target-calculator');
+  await target.locator('[name=average]').fill('80');
+  await target.locator('[name=completed]').fill('50');
+  await target.locator('[name=target]').fill('85');
+  await target.getByRole('button', { name: 'Find required score' }).click();
+  await target.getByText('Aim for 90% across the remaining 50% of the course.').waitFor();
+  const breakEven = demo.locator('#break-even-calculator');
+  await breakEven.locator('[name=fixed]').fill('1000');
+  await breakEven.locator('[name=price]').fill('30');
+  await breakEven.locator('[name=variable]').fill('12');
+  await breakEven.getByRole('button', { name: 'Find break-even' }).click();
+  await breakEven.getByText('Break even at 56 units with $18.00 contribution per unit.').waitFor();
   await demo.setViewportSize({ width: 390, height: 844 });
   const fitsViewport = () =>
     globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth;
   assert.equal(await demo.evaluate(fitsViewport), true);
+  const mobileNotice = await demo.locator('.app-preview-notice').boundingBox();
+  const mobileNav = await demo.locator('.app-rail').boundingBox();
+  assert.ok(
+    mobileNotice.y + mobileNotice.height <= mobileNav.y,
+    'Demo notice clears mobile navigation',
+  );
+  await demo.getByRole('button', { name: 'Open calculator', exact: true }).click();
+  const finance = demo.locator('#finance-calculator');
+  const output = finance.locator('output');
+  const press = async (...keys) => {
+    for (const key of keys) await finance.locator(`[data-key="${key}"]`).click();
+  };
+  await finance.locator('[data-key="ON"]').waitFor();
+  assert.equal(await finance.locator('#finance-keypad button').count(), 44);
+  for (const [width, height] of [
+    [430, 740],
+    [320, 568],
+    [844, 390],
+    [568, 320],
+  ]) {
+    await demo.setViewportSize({ width, height });
+    assert.equal(await demo.evaluate(fitsViewport), true);
+    assert.equal(await demo.locator('.app-rail').isVisible(), false);
+    const allKeysFit = await finance.locator('#finance-keypad button').evaluateAll((keys) =>
+      keys.every((key) => {
+        const rect = key.getBoundingClientRect();
+        return (
+          rect.top >= 0 &&
+          rect.bottom <= globalThis.innerHeight &&
+          rect.width >= 44 &&
+          rect.height >= 44
+        );
+      }),
+    );
+    assert.ok(allKeysFit, `All 44 keys fit at ${width}×${height} with 44px targets`);
+    const notice = await demo.locator('.app-preview-notice').boundingBox();
+    const heading = await demo.locator('#finance-view-heading').boundingBox();
+    assert.ok(notice.y + notice.height <= heading.y, 'Demo notice must not cover the calculator');
+    await demo.screenshot({ path: join(run.work, `calculator-${width}x${height}.png`) });
+  }
+  await demo.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await demo.locator('.app-rail').isVisible(), false);
+  assert.equal(await demo.evaluate(fitsViewport), true);
+  const keySize = await finance.locator('[data-key="0"]').boundingBox();
+  assert.ok(keySize.width >= 44 && keySize.height >= 44);
+  await press('ON');
+  assert.equal(await output.textContent(), '');
+  await press('ON', '2ND');
+  assert.equal(await finance.locator('[data-key="2ND"]').getAttribute('aria-pressed'), 'true');
+  await press('IY', '1', '2', 'ENTER', '2ND', 'CPT');
+  await press('1', '2', 'N', '5', 'IY', '1', '0', '0', '0', 'SIGN', 'PV', 'CPT', 'FV');
+  assert.equal(Number((await output.textContent()).replaceAll(',', '')), 1051.16);
+  await press('2ND', 'FV', '1', '2', 'N', '1', '2', '0', '0', 'PV', 'CPT', 'PMT');
+  assert.equal(Number((await output.textContent()).replaceAll(',', '')), -100);
+  await press('CF', '2ND', 'CE', '1', '0', '0', 'SIGN', 'ENTER', 'DOWN');
+  await press('6', '0', 'ENTER', 'DOWN', 'DOWN', '6', '0', 'ENTER');
+  await press('NPV', '1', '0', 'ENTER', 'DOWN', 'CPT');
+  assert.equal(Number((await output.textContent()).replaceAll(',', '')), 4.13);
+  await press('IRR', 'CPT');
+  assert.equal(Number((await output.textContent()).replaceAll(',', '')), 13.07);
+  await demo.getByRole('button', { name: '← Student tools', exact: true }).click();
+  await demo.getByRole('button', { name: 'Open calculator', exact: true }).click();
+  assert.equal(Number((await output.textContent()).replaceAll(',', '')), 13.07);
+  await demo.getByRole('button', { name: '← Student tools', exact: true }).click();
   await demo.locator('.rail-main [data-view=courses]').click();
   assert.equal(await demo.evaluate(fitsViewport), true);
   assert.equal(await demo.locator('#roger-widget-sources article').count(), 0);

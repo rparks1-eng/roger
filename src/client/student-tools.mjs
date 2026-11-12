@@ -1,24 +1,105 @@
-const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const percent = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+const gradePoints = [
+  ['A', 4],
+  ['A−', 3.67],
+  ['B+', 3.33],
+  ['B', 3],
+  ['B−', 2.67],
+  ['C+', 2.33],
+  ['C', 2],
+  ['C−', 1.67],
+  ['D+', 1.33],
+  ['D', 1],
+  ['D−', 0.67],
+  ['F', 0],
+];
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-export function mountStudentTools({ finance, grades, items, add }) {
-  const financeResult = finance.querySelector('output');
-  finance.addEventListener('input', () => (financeResult.value = ''));
-  finance.addEventListener('submit', (event) => {
+function bindCalculator(form, calculate) {
+  const output = form.querySelector('output');
+  form.addEventListener('input', () => (output.value = ''));
+  form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const fields = finance.elements;
-    const amount = fields.amount.valueAsNumber;
-    const rate = fields.rate.valueAsNumber / 1200;
-    const months = fields.months.valueAsNumber;
-    const growth = Math.log1p(rate) * months;
-    if (fields.kind.value === 'loan') {
-      const payment = rate === 0 ? amount / months : (amount * rate) / -Math.expm1(-growth);
-      financeResult.value = `${money.format(payment)} per month`;
-    } else {
-      financeResult.value = `${money.format(amount * Math.exp(growth))} after ${months} months`;
-    }
+    output.value = calculate(form.elements);
   });
+}
 
+function mountGpa(form, list, add) {
+  function addCourse(focus = false) {
+    const index = list.childElementCount + 1;
+    const row = document.createElement('fieldset');
+    const legend = document.createElement('legend');
+    legend.textContent = `Course ${index}`;
+    const gradeLabel = document.createElement('label');
+    gradeLabel.textContent = 'Letter grade';
+    const grade = document.createElement('select');
+    grade.add(new Option('Choose grade', ''));
+    for (const [letter, points] of gradePoints) grade.add(new Option(letter, String(points)));
+    gradeLabel.append(grade);
+    const creditLabel = document.createElement('label');
+    creditLabel.textContent = 'Credits';
+    const credits = document.createElement('input');
+    credits.type = 'number';
+    credits.min = '0.01';
+    credits.step = '0.01';
+    creditLabel.append(credits);
+    row.append(legend, gradeLabel, creditLabel);
+    list.append(row);
+    add.disabled = index === 12;
+    if (focus) grade.focus();
+  }
+  addCourse();
+  addCourse();
+  add.addEventListener('click', () => addCourse(true));
+  bindCalculator(form, () => {
+    let points = 0;
+    let credits = 0;
+    for (const row of list.children) {
+      const grade = row.querySelector('select');
+      const credit = row.querySelector('input');
+      if (!grade.value && !credit.value) continue;
+      if (!grade.value || !credit.value) {
+        (grade.value ? credit : grade).focus();
+        return 'Enter both a letter grade and credits for each course you use.';
+      }
+      points += Number(grade.value) * credit.valueAsNumber;
+      credits += credit.valueAsNumber;
+    }
+    return credits
+      ? `${(points / credits).toFixed(2)} estimated GPA across ${percent.format(credits)} credits.`
+      : 'Add at least one letter-graded course.';
+  });
+}
+
+export function mountStudentTools({
+  grades,
+  items,
+  add,
+  gpa,
+  gpaCourses,
+  addGpaCourse,
+  target,
+  breakEven,
+}) {
+  mountGpa(gpa, gpaCourses, addGpaCourse);
+  bindCalculator(target, ({ average, completed, target }) => {
+    const remaining = 100 - completed.valueAsNumber;
+    if (!remaining) return 'All course weight has been graded.';
+    const needed =
+      (target.valueAsNumber * 100 - average.valueAsNumber * completed.valueAsNumber) / remaining;
+    if (needed <= 0) return 'Your graded work already covers this target.';
+    const required = percent.format(Math.ceil(needed * 100 - 1e-8) / 100);
+    return needed > 100 + 1e-8
+      ? `You would need ${required}% on the remaining work. That exceeds 100%.`
+      : `Aim for ${required}% across the remaining ${percent.format(remaining)}% of the course.`;
+  });
+  bindCalculator(breakEven, ({ fixed, price, variable }) => {
+    const cents = (field) => Math.round(field.valueAsNumber * 100);
+    const margin = cents(price) - cents(variable);
+    if (margin <= 0) return 'The unit price must exceed the variable cost to cover fixed costs.';
+    const units = Math.ceil(cents(fixed) / margin);
+    return `Break even at ${units.toLocaleString()} units with ${money.format(margin / 100)} contribution per unit.`;
+  });
   const gradesResult = grades.querySelector('output');
   function addGradeItem(focus = false) {
     const index = items.childElementCount + 1;

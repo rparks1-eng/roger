@@ -21,6 +21,8 @@ import { createNarrationService } from './narration.mjs';
 import { createConnectionService, ConnectionError } from './connections.mjs';
 import { createFeatureBuilder } from './builder.mjs';
 import { captureAppAssets, createAppChangeService } from './app-changes.mjs';
+import { createMaskedCanvas } from './masked-canvas.mjs';
+import { canvasCallback, createCanvasOAuth } from './canvas-oauth.mjs';
 import { createAppPreview } from './app-preview.mjs';
 import { recoveryHTML, recoveryCSS, recoveryJS } from './app-recovery.mjs';
 import { createAppearanceBuilder } from './appearance-builder.mjs';
@@ -81,6 +83,10 @@ export const readerAssets = new Map([
     'app-changes-ui',
     'resources-ui',
     'student-tools',
+    'financial-calculator-ui',
+    'financial-calculator',
+    'financial-math',
+    'financial-worksheets',
     'reading-library',
     'homework-planner',
     'roger-navigation',
@@ -106,6 +112,8 @@ export function createReaderServer({
   memoryStore = createMemoryStore({ dbPath: ':memory:' }),
   clock = Date.now,
   configuredCanvas = null,
+  canvasOAuthConfig = null,
+  canvasOAuthFetch,
   submissionOptions = {},
 } = {}) {
   const assets = readerAssets;
@@ -113,10 +121,24 @@ export function createReaderServer({
   const appearanceBuilder = createAppearanceBuilder();
   const resourceSearch = createResourceSearch();
   const connections = new WeakMap();
+  const canvasOAuth = createCanvasOAuth({
+    config: canvasOAuthConfig,
+    now: clock,
+    fetcher: canvasOAuthFetch,
+    validate: (...args) => canvasAdapter.validateCanvasToken(...args),
+  });
+  const maskedRecordings = new WeakMap();
+  function closeMaskedRecording(session) {
+    const pending = maskedRecordings.get(session);
+    maskedRecordings.delete(session);
+    void pending?.then((preview) => preview.close()).catch(() => {});
+  }
   const sessions = createSessions({
     clock,
     onDispose: (session) => {
       connections.get(session)?.dispose();
+      closeMaskedRecording(session);
+      canvasOAuth.clear(session);
       void Promise.resolve(appChanges.disposeOwner(session.csrf)).catch(() => {});
     },
   });
@@ -169,6 +191,24 @@ export function createReaderServer({
     try {
       assertHost(req);
       const url = new URL(req.url, `http://${req.headers.host}`);
+      if (req.method === 'GET' && url.pathname === canvasCallback) {
+        const connected = await canvasOAuth.finish(url, req.headers.cookie, controller.signal);
+        if (connected) closeMaskedRecording(connected);
+        const destination = `/?setup=settings&canvas=${connected ? 'connected' : 'incomplete'}`;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end(
+          `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${destination.replace('&', '&amp;')}"><title>Canvas sign-in</title><a href="${destination.replace('&', '&amp;')}">Return to Roger</a>`,
+        );
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/demo-return' && url.hostname === '127.0.0.1') {
+        // The bridge loads before returning to the owner origin, so its Strict cookie is reused.
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end(
+          '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/?setup=settings"><title>Roger settings</title><a href="/?setup=settings">Return to Roger settings</a>',
+        );
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/demo') {
         const site = req.headers['sec-fetch-site'];
         if (site && site !== 'same-origin' && site !== 'none')
@@ -231,6 +271,7 @@ export function createReaderServer({
           canvas: session.profile,
           ephemeral: true,
           recordingAvailable: true,
+          ...(canvasOAuth.enabled(url.origin) ? { canvasSignInAvailable: true } : {}),
         });
         return;
       }
@@ -238,6 +279,40 @@ export function createReaderServer({
         assertMutation(req, session, {
           binary: ['/api/documents/ocr', '/api/documents/presentation'].includes(url.pathname),
         });
+      if (req.method === 'POST' && url.pathname === '/api/canvas/oauth/start') {
+        await readJson(req, 512, controller.signal);
+        const { url: destination, cookie } = canvasOAuth.begin(session, url.origin);
+        res.setHeader('Set-Cookie', cookie);
+        json({ url: destination });
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/demo/start') {
+        await readJson(req, 512, controller.signal);
+        const returnToSettings = `http://127.0.0.1:${server.address().port}/demo-return`;
+        const maskedCanvas = session.token
+          ? createMaskedCanvas({
+              adapter: canvasAdapter,
+              now: clock,
+              connection: async () => {
+                const token = await canvasOAuth.token(session);
+                if (!token) throw new HttpError(409, 'Reconnect Canvas in Roger settings.');
+                return token;
+              },
+            })
+          : undefined;
+        closeMaskedRecording(session);
+        const pending = captureAppAssets(assetRoot, assets).then((files) =>
+          createAppPreview({ files, recording: true, maskedCanvas, returnToSettings }),
+        );
+        maskedRecordings.set(session, pending);
+        try {
+          json({ url: (await pending).url });
+        } catch {
+          if (maskedRecordings.get(session) === pending) maskedRecordings.delete(session);
+          throw new HttpError(500, 'Demo mode could not start. Try again.');
+        }
+        return;
+      }
       release = admit(
         session,
         clock,
@@ -265,6 +340,11 @@ export function createReaderServer({
                   ? 'default'
                   : 'ui',
       );
+      if (
+        url.pathname.startsWith('/api/canvas/') &&
+        !['/api/canvas/connect', '/api/canvas/disconnect'].includes(url.pathname)
+      )
+        await canvasOAuth.token(session);
       if (req.method === 'GET' && url.pathname.startsWith('/api/memory/')) {
         const action = url.pathname.split('/').at(-1);
         const operations = {
@@ -592,6 +672,8 @@ export function createReaderServer({
         const profile = await canvasAdapter.validateCanvasToken(body.token, {
           signal: controller.signal,
         });
+        closeMaskedRecording(session);
+        canvasOAuth.clear(session);
         session.token = body.token;
         session.profile = profile;
         json({ profile });
@@ -599,6 +681,8 @@ export function createReaderServer({
       }
       if (req.method === 'POST' && url.pathname === '/api/canvas/disconnect') {
         await readJson(req, 65_536, controller.signal);
+        closeMaskedRecording(session);
+        canvasOAuth.clear(session);
         session.token = null;
         session.profile = null;
         delete session.submissionDraft;

@@ -15,17 +15,22 @@ Open [Roger](http://127.0.0.1:3847/). The server binds to loopback only. Setup i
 
 If the system Python is unsuitable, set `READER_PYTHON` to the absolute path of a supported interpreter. Development setup uses `READER_SETUP_PYTHON` when supplied. The direct `node src/server/index.mjs` entry bypasses development checks and is intended for debugging.
 
-For recordings, choose **Settings → Open demo mode**, or run `npm run demo`
-and open the printed local URL. Record the tab marked **Demo mode**. It serves
-fictional classes and assignments on a separate browser origin. **Ask Roger**
-uses local lookup over the demo materials and opens cited assignments, syllabus
-pages, or readings in the same tab. Demo questions do not use a connected Canvas
-account, saved conversations, or live AI. The session closes after two hours.
-Keep the terminal running if you launched the demo there.
+For recordings, turn on **Settings → Demo mode**. With Canvas connected, the
+demo reads the live course list, assignments, modules and syllabus matches. It
+shows aliases, generated dates and submission statuses, and sample text. The
+browser receives masked records on a separate origin. Original file contents,
+Canvas links and IDs, account names, and saved conversations stay out of that
+view. Source counts and available sections can still reflect the live course.
+**Ask Roger** cites the masked syllabus or assignment when available. Turn off
+the same switch to return to your private workspace. Without a Canvas connection,
+the switch opens fictional classes, as does `npm run demo`.
 
 On **Today**, open **Find books**, **News & research**, or **Student tools**.
-Student tools includes a financial calculator and a weighted-grade calculator.
-Both run in the browser and are available in Demo mode. Search for
+Student tools includes a BA II Plus-style financial calculator, weighted grades,
+a Babson undergraduate semester GPA estimator, a final-grade target calculator,
+and a venture break-even calculator.
+The financial keypad supports TVM, amortization, cash flows, memory, and the 2nd-key worksheets.
+The tools run in the browser and are available in Demo mode. Search for
 `Pride and Prejudice` in Demo mode to show a sample free-book result.
 
 ## Connect your services
@@ -33,11 +38,22 @@ Both run in the browser and are available in Demo mode. Search for
 Open **AI connections** and choose a provider:
 
 - **Codex:** use the official Codex account signed in on this computer, or open its official sign-in. Connecting Roger does not give it the history of your Codex chats.
-- **OpenAI, Claude, Gemini, or Grok API:** provide that service's API key and select an available model. API access and billing are separate from consumer chat subscriptions; Roger does not collect chat-account passwords.
+- **OpenAI, Claude, Gemini, or Grok API:** provide that service's API key and select an available model. API access and billing are separate from consumer chat subscriptions. [Anthropic's Claude Code authentication policy](https://code.claude.com/docs/en/legal-and-compliance) explains which integrations can use a subscription.
 
 Connections require an explicit choice. API keys stay in server memory and are cleared on disconnect, session expiry, or restart. Codex has been exercised against a real account; the other provider transports have synthetic integration tests. A provider may reject a listed model for account, endpoint, or usage-limit reasons. Roger does not silently switch providers.
 
-The current Canvas adapter targets **Babson Canvas** and supports an explicitly provisioned single-owner local connection. Teammates can run Demo mode and read local documents without a Canvas account. Student sign-in requires a school administrator to issue a scoped developer key and approve a callback for an OAuth integration. Use the existing token field only for institution-authorized testing. [Canvas developer key requirements](https://developerdocs.instructure.com/services/canvas/oauth2/file.developer_keys)
+The Canvas adapter targets **Babson Canvas**. Once Babson approves a read-scoped
+developer key, **Settings → Sign in with Babson Canvas** opens the official
+Canvas login and returns to the course list after consent. Configure
+`READER_CANVAS_OAUTH_CLIENT_ID`, `READER_CANVAS_OAUTH_CLIENT_SECRET`,
+`READER_CANVAS_OAUTH_REDIRECT_URI`, and the approved space-separated
+`READER_CANVAS_OAUTH_SCOPES` on the server. The registered callback for the
+default local port is `http://127.0.0.1:3847/api/canvas/oauth/callback`.
+The requested scopes must match the school's approved GET routes for the
+features in use, including the profile endpoint. OAuth access and refresh
+tokens stay in the local server session. **Local developer setup** retains the
+manual token field for one's own institution-authorized tests.
+[Canvas developer key requirements](https://developerdocs.instructure.com/services/canvas/oauth2/file.developer_keys)
 
 ## Study and read
 

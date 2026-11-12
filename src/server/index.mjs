@@ -1,6 +1,7 @@
 import { createReaderServer, startRecordingDemo } from './http.mjs';
 import { createMemoryStore } from './memory.mjs';
 import { loadOwnerCanvas } from './owner-canvas.mjs';
+import { readCanvasOAuthConfig } from './canvas-oauth.mjs';
 if (process.argv.includes('--demo')) {
   const demo = await startRecordingDemo();
   console.log(`Roger Demo mode: ${demo.url}`);
@@ -11,6 +12,7 @@ if (process.argv.includes('--demo')) {
     throw new Error('Choose a local port from 1024 to 65535.');
   const server = createReaderServer({
     configuredCanvas: await loadOwnerCanvas(),
+    canvasOAuthConfig: readCanvasOAuthConfig(),
     memoryStore: createMemoryStore(),
   });
   server.listen(port, '127.0.0.1', () =>

@@ -42,6 +42,12 @@ async function request(url, { body, signal, binary = false } = {}, attempt = 0) 
     cache: 'no-store',
     redirect: 'error',
     signal,
+  }).catch((error) => {
+    if (error instanceof TypeError && !signal?.aborted)
+      throw new Error('Connection interrupted. Check your connection and try again.', {
+        cause: error,
+      });
+    throw error;
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

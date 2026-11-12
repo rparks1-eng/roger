@@ -1,4 +1,5 @@
 import { disposeDocuments, readDocument } from '/client/documents.mjs';
+import { isPreviewSession } from '/client/api.mjs';
 import { skeleton } from '/client/loading-ui.mjs';
 import { openSyllabusReading } from '/client/syllabus-ui.mjs';
 
@@ -322,7 +323,8 @@ export function mountAssignmentStudy({
   file.accept = '.pdf,.txt,.md,application/pdf,text/plain';
   const fileList = element('div', undefined, 'study-note-files');
   const fileHint = element('p', 'PDF, TXT or Markdown · up to two files', 'muted');
-  noteArea.append(noteLabel, notes, fileLabel, file, fileHint, fileList);
+  noteArea.append(noteLabel, notes);
+  if (!isPreviewSession()) noteArea.append(fileLabel, file, fileHint, fileList);
 
   const toolbar = element('div', undefined, 'study-actions');
   const modeLabel = element('label', 'Format');
@@ -383,7 +385,7 @@ export function mountAssignmentStudy({
   const controls = () => {
     const busy = loading || readingFile || Boolean(generating);
     quick.disabled = local.disabled = busy;
-    local.hidden = SOURCE_ONLY.includes(mode.value);
+    local.hidden = isPreviewSession() || SOURCE_ONLY.includes(mode.value);
     notes.disabled = mode.disabled = Boolean(generating);
     topic.disabled = Boolean(generating);
     file.disabled = readingFile || Boolean(generating) || draft.files.length >= 2;
