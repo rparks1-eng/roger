@@ -4171,3 +4171,28 @@ textarea,
     padding: 10px;
   }
 }
+
+/* Keep dense course titles readable without letting one date stretch a week. */
+.calendar-assignment strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+@media (min-width: 701px) and (max-width: 1200px) {
+  .app-header {
+    padding-inline: 3%;
+    gap: 16px;
+  }
+  .primary-nav {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .nav-button {
+    padding-inline: 10px;
+  }
+  .header-end {
+    display: none;
+  }
+}
