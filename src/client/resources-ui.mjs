@@ -23,7 +23,7 @@ export function createResourcesUI({ container, api }) {
   input.required = true;
   input.maxLength = 240;
   input.placeholder = 'Pride and Prejudice, Jane Austen, or an ISBN…';
-  const search = el('button', 'Find resources', 'button button-primary');
+  const search = el('button', 'Find free copies', 'button button-primary');
   search.type = 'submit';
   const cancel = el('button', 'Cancel search', 'button button-quiet');
   cancel.type = 'button';
@@ -39,7 +39,7 @@ export function createResourcesUI({ container, api }) {
     controller?.abort();
     controller = new AbortController();
     input.value = query;
-    status.textContent = 'Searching book catalogs…';
+    status.textContent = 'Looking for free full books…';
     search.disabled = true;
     cancel.hidden = false;
     try {
@@ -53,35 +53,42 @@ export function createResourcesUI({ container, api }) {
       const missing = data.sources
         .filter((source) => source.state === 'unavailable')
         .map((source) => source.name);
-      status.textContent = `${data.results.length} catalog matches${data.cached ? ' · cached for up to five minutes' : ''}.${missing.length ? ` ${missing.join(' and ')} could not be reached; try its catalog below.` : ''}`;
+      const count = data.results.length;
+      const match = data.isbn ? ` for ISBN ${data.isbn}` : '';
+      status.textContent =
+        (count
+          ? `${count} free ${count === 1 ? 'book' : 'books'} found${match}.`
+          : `No free full copy found${match}.`) +
+        (missing.length ? ` Search unavailable at ${missing.join(' and ')}.` : '');
       for (const item of data.results) {
         const card = el('article', undefined, 'resource-card');
         const title = el('h3');
-        title.append(link(item.title, item.sourceUrl));
+        title.textContent = item.title;
         card.append(
           title,
           el(
             'p',
-            [item.authors.join(', '), item.year, item.isbn ? `ISBN ${item.isbn}` : '']
+            [item.authors.join(', '), item.edition, item.year, item.isbn ? `ISBN ${item.isbn}` : '']
               .filter(Boolean)
               .join(' · '),
           ),
           el('p', `${item.source} · ${item.access}`, 'field-hint'),
         );
         const actions = el('div', undefined, 'resource-actions');
-        actions.append(link('Catalog & edition details', item.sourceUrl));
-        if (item.previewUrl)
-          actions.append(
-            link(
-              item.access === 'Preview listed' ? 'Open preview' : 'Read online',
-              item.previewUrl,
-            ),
+        for (const download of item.downloads) {
+          const action = link(
+            download.direct ? `Download ${download.format}` : `Get free ${download.format}`,
+            download.url,
           );
-        if (item.downloadUrl) actions.append(link('Download PDF from provider', item.downloadUrl));
+          action.className = 'button button-primary';
+          actions.append(action);
+        }
+        if (!item.downloads.some((download) => download.url === item.sourceUrl))
+          actions.append(link('Edition details', item.sourceUrl));
         card.append(actions);
         results.append(card);
       }
-      catalogs.append(el('h2', 'More places to look'));
+      catalogs.append(el('h2', 'More free book collections'));
       for (const catalog of data.catalogs) {
         const row = el('p');
         row.append(
@@ -114,10 +121,10 @@ export function createResourcesUI({ container, api }) {
   });
   function render() {
     container.replaceChildren(
-      el('h1', 'Find books & readings'),
+      el('h1', 'Find free textbooks'),
       el(
         'p',
-        'Look across Open Library and Google Books, then check previews, public scans and download options at the source.',
+        'Search by ISBN for your assigned edition, or by title, author, or subject for free textbooks and readings.',
       ),
       form,
       status,
@@ -125,7 +132,7 @@ export function createResourcesUI({ container, api }) {
       catalogs,
       el(
         'p',
-        'Your search goes to these public catalogs. Availability can depend on the edition, location and provider account. This searches book records; it does not add or upload your course files.',
+        'Downloads open at the source. For a class reading, check the edition before using it.',
         'field-hint',
       ),
     );

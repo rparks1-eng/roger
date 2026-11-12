@@ -3,82 +3,116 @@ import assert from 'node:assert/strict';
 import { createResourceSearch } from '../src/server/web-resources.mjs';
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status });
 const openData = {
-  docs: [
+  data: [
     {
-      key: '/works/OL123W',
-      title: 'Book <script>text only</script>',
-      author_name: ['Author'],
-      first_publish_year: 1900,
-      isbn: ['9781234567890'],
-      public_scan_b: true,
-      ia: ['public-scan'],
+      id: 123,
+      title: 'Financial Accounting',
+      edition_statement: '2e',
+      license: 'Attribution',
+      url: 'https://open.umn.edu/opentextbooks/textbooks/financial-accounting',
+      isbn13: '9781234567890',
+      formats: [
+        { type: 'PDF', url: 'https://web.ung.edu/media/book.pdf', price: { cents: 0 } },
+        {
+          type: 'eBook',
+          url: 'https://openstax.org/details/books/accounting',
+          price: { cents: 0 },
+        },
+        { type: 'Hardcopy', url: 'https://example.com/store', price: { cents: 0 } },
+        { type: 'EPUB', url: 'https://example.com/store.epub', price: { cents: 799 } },
+      ],
     },
   ],
 };
 const googleData = {
   items: [
     {
-      id: 'volume1',
-      volumeInfo: {
-        title: 'A second edition',
-        authors: ['Author'],
-        publishedDate: '2002',
-        previewLink: 'http://books.google.com/books?id=volume1',
+      id: 'sample',
+      volumeInfo: { title: 'Sample only' },
+      accessInfo: {
+        publicDomain: true,
+        viewability: 'PARTIAL',
+        pdf: { isAvailable: true, downloadLink: 'https://books.google.com/sample' },
       },
-      accessInfo: { viewability: 'PARTIAL', pdf: { isAvailable: false } },
+    },
+    {
+      id: 'full',
+      volumeInfo: { title: 'Complete book' },
+      accessInfo: {
+        publicDomain: true,
+        viewability: 'ALL_PAGES',
+        epub: { isAvailable: true, downloadLink: 'https://books.google.com/download' },
+      },
     },
   ],
 };
-const fetcher = async (url) => response(url.includes('openlibrary.org') ? openData : googleData);
+const fetcher = async (url) => response(url.includes('open.umn.edu') ? openData : googleData);
 
-test('book results preserve source identity and distinguish previews from downloads', async () => {
+test('only free full copies appear with accurate direct and publisher download actions', async () => {
   const result = await createResourceSearch({ fetcher }).search({ query: 'A book' });
-  assert.equal(result.results.length, 2);
-  assert.equal(result.results[0].sourceUrl, 'https://openlibrary.org/works/OL123W');
-  assert.equal(result.results[0].previewUrl, 'https://archive.org/details/public-scan');
-  assert.equal(result.results[1].access, 'Preview listed');
-  assert.equal(result.results[1].previewUrl, 'https://books.google.com/books?id=volume1');
-  assert.equal(result.results[1].downloadUrl, null);
-  assert.equal(
-    result.sources.every((item) => item.state === 'searched'),
-    true,
+  assert.deepEqual(
+    result.results.map((item) => item.title),
+    ['Financial Accounting', 'Complete book'],
   );
+  assert.equal(result.results[0].edition, '2e');
+  assert.deepEqual(result.results[0].downloads, [
+    { format: 'PDF', url: 'https://web.ung.edu/media/book.pdf', direct: true },
+    { format: 'eBook', url: 'https://openstax.org/details/books/accounting', direct: false },
+  ]);
+  assert.equal(result.results[1].downloads[0].format, 'EPUB');
 });
 
-test('metadata cannot inject external download URLs or arbitrary fetch destinations', async () => {
+test('metadata cannot inject untrusted download links or choose fetch destinations', async () => {
   const requests = [];
   const service = createResourceSearch({
     fetcher: async (url, options) => {
       requests.push({ url, options });
-      const malicious = {
-        items: [
-          {
-            id: 'valid',
-            volumeInfo: { title: 'Example', previewLink: 'javascript:alert(1)' },
-            accessInfo: {
-              viewability: 'ALL_PAGES',
-              webReaderLink: 'https://evil.example/private',
-              pdf: { isAvailable: true, downloadLink: 'http://127.0.0.1/private' },
-            },
-          },
-        ],
-      };
       return response(
-        url.includes('openlibrary.org')
-          ? { docs: [{ key: '//evil.example/a', title: 'Unsafe' }] }
-          : malicious,
+        url.includes('open.umn.edu')
+          ? {
+              data: [
+                {
+                  ...openData.data[0],
+                  formats: [
+                    { type: 'PDF', url: 'http://127.0.0.1/private.pdf', price: { cents: 0 } },
+                  ],
+                },
+              ],
+            }
+          : {
+              items: [
+                {
+                  ...googleData.items[1],
+                  accessInfo: {
+                    ...googleData.items[1].accessInfo,
+                    epub: { isAvailable: true, downloadLink: 'https://evil.example/book.epub' },
+                  },
+                },
+              ],
+            },
       );
     },
   });
   const result = await service.search({ query: 'https://internal.example' });
   assert.deepEqual(
-    requests.map((request) => new URL(request.url).hostname),
-    ['openlibrary.org', 'www.googleapis.com'],
+    requests.map((item) => new URL(item.url).hostname),
+    ['open.umn.edu', 'www.googleapis.com'],
   );
-  assert.ok(requests.every((request) => request.options.redirect === 'error'));
+  assert.ok(requests.every((item) => item.options.redirect === 'error'));
+  assert.equal(new URL(requests[1].url).searchParams.get('filter'), 'free-ebooks');
   assert.equal(result.results.length, 1);
-  assert.equal(result.results[0].previewUrl, null);
-  assert.equal(result.results[0].downloadUrl, null);
+  assert.deepEqual(result.results[0].downloads, [
+    { format: 'PDF', url: openData.data[0].url, direct: false },
+  ]);
+});
+
+test('ISBN searches return the exact edition or an empty result', async () => {
+  const service = createResourceSearch({ fetcher });
+  assert.equal(
+    (await service.search({ query: '978-1234567890' })).results[0].isbn,
+    '9781234567890',
+  );
+  assert.deepEqual((await service.search({ query: '978-1234567891' })).results, []);
 });
 
 test('cache is bounded by freshness and reports partial provider failure honestly', async () => {
@@ -120,7 +154,8 @@ test('ISBN searches are encoded, cancellation stops results and oversized querie
     },
   });
   await service.search({ query: '978-1234567890' });
-  assert.equal(requests[0].searchParams.get('q'), 'isbn:9781234567890');
+  assert.equal(requests[0].searchParams.get('q'), '9781234567890');
+  assert.equal(requests[1].searchParams.get('q'), 'isbn:9781234567890');
   const controller = new AbortController();
   controller.abort();
   await assert.rejects(service.search({ query: 'book' }, { signal: controller.signal }), {

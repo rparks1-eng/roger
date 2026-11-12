@@ -21,50 +21,90 @@ function safeUrl(value, hosts) {
     return null;
   }
 }
-function openLibraryResults(data) {
-  return (Array.isArray(data?.docs) ? data.docs : []).slice(0, 12).flatMap((item) => {
-    if (!/^\/(?:works\/OL\d+W|books\/OL\d+M)$/.test(item?.key) || !cleanText(item.title)) return [];
-    const sourceUrl = `https://openlibrary.org${item.key}`;
-    const archiveId =
-      Array.isArray(item.ia) &&
-      item.ia.find((id) => typeof id === 'string' && /^[\w.-]{1,100}$/.test(id));
+const ISBN = /^(?:\d{13}|\d{9}[\dX])$/i;
+const normalizeIsbn = (value) => cleanText(value, 30).replace(/[\s-]/g, '').toUpperCase();
+const publisherHosts = [
+  'open.umn.edu',
+  'openstax.org',
+  'assets.openstax.org',
+  'collection.bccampus.ca',
+  'opentextbc.ca',
+  'pressbooks.bccampus.ca',
+  'web.ung.edu',
+  'milneopentextbooks.geneseo.edu',
+];
+function textbookResults(data, isbn) {
+  return (Array.isArray(data?.data) ? data.data : []).slice(0, 12).flatMap((item) => {
+    const sourceUrl = safeUrl(item?.url, ['open.umn.edu']);
+    if (
+      !Number.isSafeInteger(item?.id) ||
+      !sourceUrl ||
+      !/^\/opentextbooks\/textbooks\/[a-z0-9-]+$/.test(new URL(sourceUrl).pathname) ||
+      !cleanText(item.title) ||
+      !cleanText(item.license)
+    )
+      return [];
+    const formats = Array.isArray(item.formats) ? item.formats.slice(0, 30) : [];
+    const isbns = [item.isbn13, item.isbn10, ...formats.map((format) => format?.isbn)]
+      .map(normalizeIsbn)
+      .filter((value) => ISBN.test(value));
+    if (isbn && !isbns.includes(isbn)) return [];
+    const downloads = [];
+    for (const format of formats) {
+      if (format?.price?.cents !== 0 || !['PDF', 'eBook', 'EPUB'].includes(format.type)) continue;
+      const url = safeUrl(format.url, publisherHosts) || sourceUrl;
+      const direct = /\.(pdf|epub)$/i.test(new URL(url).pathname);
+      if (!downloads.some((item) => item.url === url))
+        downloads.push({ format: format.type, url, direct });
+    }
+    if (!downloads.length) return [];
+    downloads.sort((a, b) => Number(b.direct) - Number(a.direct));
     return [
       {
-        id: `openlibrary:${item.key}`,
+        id: `otl:${item.id}`,
         title: cleanText(item.title),
-        authors: (Array.isArray(item.author_name) ? item.author_name : [])
+        edition: cleanText(item.edition_statement, 50),
+        authors: (Array.isArray(item.contributors) ? item.contributors : [])
+          .filter((person) => person?.contribution === 'Author')
           .slice(0, 4)
-          .map((name) => cleanText(name, 100)),
-        year: Number.isInteger(item.first_publish_year) ? String(item.first_publish_year) : '',
-        isbn:
-          (Array.isArray(item.isbn) ? item.isbn : []).find(
-            (isbn) => typeof isbn === 'string' && /^(?:\d{13}|\d{9}[\dXx])$/.test(isbn),
-          ) ?? '',
-        source: 'Open Library',
+          .map((person) =>
+            [person.first_name, person.last_name]
+              .map((part) => cleanText(part, 60))
+              .filter(Boolean)
+              .join(' '),
+          ),
+        year: Number.isInteger(item.copyright_year) ? String(item.copyright_year) : '',
+        isbn: isbn || isbns[0] || '',
+        source: 'Open Textbook Library',
         sourceUrl,
-        access: item.public_scan_b === true ? 'Public scan listed' : 'Catalog record',
-        previewUrl:
-          item.public_scan_b === true && archiveId
-            ? `https://archive.org/details/${archiveId}`
-            : null,
-        downloadUrl: null,
+        access: cleanText(item.license, 80),
+        downloads,
       },
     ];
   });
 }
-function googleResults(data) {
-  const hosts = ['books.google.com', 'play.google.com', 'books.googleusercontent.com'];
+function googleResults(data, isbn) {
+  const hosts = ['books.google.com', 'books.googleusercontent.com'];
   return (Array.isArray(data?.items) ? data.items : []).slice(0, 12).flatMap((item) => {
+    const info = item?.volumeInfo,
+      access = item?.accessInfo;
     if (
-      typeof item?.id !== 'string' ||
-      !/^[\w-]{1,80}$/.test(item.id) ||
-      !cleanText(item.volumeInfo?.title)
+      !/^[\w-]{1,80}$/.test(item?.id || '') ||
+      !cleanText(info?.title) ||
+      access?.publicDomain !== true ||
+      access.viewability !== 'ALL_PAGES'
     )
       return [];
-    const info = item.volumeInfo,
-      access = item.accessInfo ?? {};
-    const sourceUrl = `https://books.google.com/books?id=${encodeURIComponent(item.id)}`;
-    const viewable = ['PARTIAL', 'ALL_PAGES'].includes(access.viewability);
+    const isbns = (Array.isArray(info.industryIdentifiers) ? info.industryIdentifiers : [])
+      .map((entry) => normalizeIsbn(entry?.identifier))
+      .filter((value) => ISBN.test(value));
+    if (isbn && !isbns.includes(isbn)) return [];
+    const downloads = ['pdf', 'epub'].flatMap((format) => {
+      const entry = access[format];
+      const url = entry?.isAvailable === true ? safeUrl(entry.downloadLink, hosts) : null;
+      return url ? [{ format: format.toUpperCase(), url, direct: true }] : [];
+    });
+    if (!downloads.length) return [];
     return [
       {
         id: `google:${item.id}`,
@@ -73,21 +113,11 @@ function googleResults(data) {
           .slice(0, 4)
           .map((name) => cleanText(name, 100)),
         year: cleanText(info.publishedDate, 20),
-        isbn:
-          (Array.isArray(info.industryIdentifiers) ? info.industryIdentifiers : [])
-            .filter((entry) => ['ISBN_10', 'ISBN_13'].includes(entry?.type))
-            .map((entry) => cleanText(entry.identifier, 20))[0] ?? '',
+        isbn: isbn || isbns[0] || '',
         source: 'Google Books',
-        sourceUrl,
-        access:
-          access.viewability === 'ALL_PAGES'
-            ? 'Full view listed'
-            : access.viewability === 'PARTIAL'
-              ? 'Preview listed'
-              : 'Catalog record',
-        previewUrl: viewable ? safeUrl(access.webReaderLink ?? info.previewLink, hosts) : null,
-        downloadUrl:
-          access.pdf?.isAvailable === true ? safeUrl(access.pdf.downloadLink, hosts) : null,
+        sourceUrl: `https://books.google.com/books?id=${encodeURIComponent(item.id)}`,
+        access: 'Public domain',
+        downloads,
       },
     ];
   });
@@ -96,24 +126,19 @@ export function resourceCatalogLinks(query) {
   const encoded = encodeURIComponent(query);
   return [
     {
+      name: 'Open Textbook Library',
+      url: `https://open.umn.edu/opentextbooks/textbooks?q=${encoded}`,
+      detail: 'Search openly licensed college textbooks',
+    },
+    {
       name: 'Project Gutenberg',
       url: `https://www.gutenberg.org/ebooks/search/?query=${encoded}`,
-      detail: 'Search public-domain books',
+      detail: 'Find free downloads of public-domain books',
     },
     {
       name: 'Directory of Open Access Books',
       url: `https://directory.doabooks.org/discover?query=${encoded}`,
-      detail: 'Search open-access scholarly books',
-    },
-    {
-      name: 'Internet Archive',
-      url: `https://archive.org/search?query=${encoded}`,
-      detail: 'Check the item’s access and borrowing options',
-    },
-    {
-      name: 'Google Books',
-      url: `https://books.google.com/books?q=${encoded}`,
-      detail: 'Find editions and publisher previews',
+      detail: 'Find open-access scholarly books',
     },
   ];
 }
@@ -182,19 +207,16 @@ export function createResourceSearch({ fetcher = fetch, clock = Date.now } = {})
       try {
         const timeout = AbortSignal.timeout(10_000);
         const operation = signal ? AbortSignal.any([signal, timeout]) : timeout;
-        const isbn = query.replace(/[\s-]/g, '');
-        const searchQuery = /^(?:\d{13}|\d{9}[\dXx])$/.test(isbn) ? `isbn:${isbn}` : query;
-        const openUrl = new URL('https://openlibrary.org/search.json');
-        openUrl.search = new URLSearchParams({
-          q: searchQuery,
-          limit: '12',
-          fields: 'key,title,author_name,first_publish_year,isbn,ia,public_scan_b',
-        });
+        const candidate = query.replace(/[\s-]/g, '').toUpperCase();
+        const isbn = ISBN.test(candidate) ? candidate : '';
+        const openUrl = new URL('https://open.umn.edu/opentextbooks/textbooks.json');
+        openUrl.searchParams.set('q', isbn || query);
         const googleUrl = new URL('https://www.googleapis.com/books/v1/volumes');
         googleUrl.search = new URLSearchParams({
-          q: searchQuery,
+          q: isbn ? `isbn:${isbn}` : query,
           maxResults: '12',
           printType: 'books',
+          filter: 'free-ebooks',
         });
         const attempts = await Promise.allSettled([
           metadata(openUrl.href, operation),
@@ -205,16 +227,17 @@ export function createResourceSearch({ fetcher = fetch, clock = Date.now } = {})
           sources = [];
         for (let index = 0; index < attempts.length; index++) {
           const attempt = attempts[index];
-          const name = ['Open Library', 'Google Books'][index];
+          const name = ['Open Textbook Library', 'Google Books'][index];
           sources.push({
             name,
             state: attempt.status === 'fulfilled' ? 'searched' : 'unavailable',
           });
           if (attempt.status === 'fulfilled')
-            results.push(...[openLibraryResults, googleResults][index](attempt.value));
+            results.push(...[textbookResults, googleResults][index](attempt.value, isbn));
         }
         const result = {
           query,
+          isbn,
           results,
           sources,
           catalogs: resourceCatalogLinks(query),
