@@ -892,7 +892,7 @@ export function createCanvasPanel({
       ...[...communitySections].map(([key, label]) => [key, label, null]),
     ]) {
       const button = action(
-        count === null ? label : `${label} · ${count}`,
+        state.recording || count === null ? label : `${label} · ${count}`,
         () => {
           invalidate();
           activeAssignment = null;

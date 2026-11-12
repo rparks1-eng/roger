@@ -685,7 +685,7 @@ try {
     JSON.stringify(maskedPayloads),
     /Private|babson\.instructure\.com|993311|9988|Missing essay/,
   );
-  await page.getByRole('button', { name: /^Assignments ·/ }).click();
+  await page.getByRole('button', { name: 'Assignments', exact: true }).click();
   await page.locator('.canvas-course-content .canvas-assignment-row').first().click();
   await page.getByRole('button', { name: 'Study this', exact: true }).click();
   const maskedStudy = page.locator('#assignment-study-slot');

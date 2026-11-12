@@ -8,7 +8,7 @@
       "sha256": "0f8a3fb971ae4fc8695e1ff20487799e89dd927d90e652e21ea5b1ef22149ca9",
       "dependencyLockSha256": "ba0cc463d8cf741c9bfc6a9f5182fb6633fa95cf1819b23a15947a387c731075"
     },
-    "fingerprint": "36e797414dc1be05d67493654a8e8c5c9da186ea52ac4d986ef0667bec179a54",
+    "fingerprint": "8064fe91bb9dd6951ab5300308543ba869f5505f61ac8f37001f152e70313601",
     "modules": [
       {
         "file": "src/client/api.mjs",
@@ -386,7 +386,7 @@
       },
       {
         "file": "src/client/canvas-ui.mjs",
-        "sha256": "f5dbafed4f308a81dc34dd3d20381dd3e843fb579a80a605c93b66754aee7388",
+        "sha256": "3e25c0615963bfab0836f8e4e1f30dc77b52428547541736edfc64d08a19385a",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
           "src/client/canvas-display.mjs",
@@ -2545,7 +2545,7 @@
     ]
   },
   "coverage": "JavaScript/TypeScript and Python static imports plus verified worker declarations; no runtime data lineage or provider reachability claim.",
-  "fingerprint": "86a6ad5200409356229c4cb131a4f232404b2f3b76c69a82ff8271c6d3e9ad7b",
+  "fingerprint": "14ae336496f76fd88fec3b792f05e75b55ee45191654d8cef89632066636c243",
   "sources": [
     {
       "path": "src/client/api.mjs",
@@ -2573,7 +2573,7 @@
     },
     {
       "path": "src/client/canvas-ui.mjs",
-      "sha256": "f5dbafed4f308a81dc34dd3d20381dd3e843fb579a80a605c93b66754aee7388"
+      "sha256": "3e25c0615963bfab0836f8e4e1f30dc77b52428547541736edfc64d08a19385a"
     },
     {
       "path": "src/client/chat-format.mjs",
