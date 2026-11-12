@@ -1,0 +1,62 @@
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.connection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border, #becdbf);
+  border-radius: 20px;
+  background: var(--surface, #e6eee3);
+}
+.connection-card h3,
+.connection-card p {
+  margin: 0;
+}
+.connection-card p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.connection-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.connection-form {
+  display: grid;
+  gap: 0.8rem;
+}
+.connection-card .connection-consent {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  line-height: 1.45;
+  font-size: 0.85rem;
+}
+.connection-consent input {
+  flex: none;
+  margin-top: 0.2rem;
+  width: auto;
+}
+.connection-card input[type='password'],
+.connection-card select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem;
+}
+.connection-state,
+.connection-current {
+  font-weight: 700;
+}
+.connection-notice:empty {
+  display: none;
+}
+.connection-notice {
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: var(--surface, #e6eee3);
+}

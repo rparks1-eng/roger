@@ -1,0 +1,112 @@
+.builder-heading {
+  margin-bottom: 2rem;
+}
+.builder-heading h1 {
+  margin: 0.25rem 0 0.5rem;
+}
+.builder-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 1.5rem;
+}
+.feature-library {
+  border-right: 1px solid var(--line, #cad8cb);
+  padding-right: 1.25rem;
+}
+.feature-library h2 {
+  font-size: 1rem;
+}
+.feature-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.feature-list-item {
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: var(--surface, #f1f6ed);
+  color: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.feature-list-item:hover {
+  border-color: currentColor;
+}
+.builder-workspace {
+  min-width: 0;
+}
+.builder-workspace h2 {
+  margin-top: 0;
+}
+.builder-workspace form {
+  display: grid;
+  gap: 0.65rem;
+}
+.builder-workspace textarea {
+  width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.builder-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.builder-status {
+  min-height: 1.5em;
+}
+.builder-review {
+  margin: 1rem 0;
+}
+.feature-stage {
+  min-width: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.feature-stage:empty {
+  display: none;
+}
+.feature-frame {
+  display: block;
+  border: 1px solid #b9caba;
+  border-radius: 16px;
+  width: 100%;
+  height: min(70vh, 760px);
+  min-height: 420px;
+  background: #f4f8f1;
+  box-sizing: border-box;
+}
+.feature-loading {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(110deg, #dce8db 20%, #edf4e7 40%, #dce8db 60%);
+  background-size: 220% 100%;
+  animation: feature-shimmer 2s ease infinite;
+}
+@keyframes feature-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feature-loading {
+    animation: none;
+  }
+}
+@media (max-width: 700px) {
+  .builder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .feature-library {
+    border-right: 0;
+    border-bottom: 1px solid #cad8cb;
+    padding: 0 0 1rem;
+  }
+  .feature-list {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+}

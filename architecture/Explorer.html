@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Atlas Reader — how the pieces connect</title>
+    <style>
+      :root {
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: #183139;
+  background: #f3f6f4;
+  line-height: 1.5;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+a {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+.graph-window:focus-visible {
+  outline: 3px solid #eaab45;
+  outline-offset: 3px;
+}
+header {
+  padding: 24px clamp(18px, 4vw, 55px);
+  background: #163c3c;
+  color: #fff;
+}
+h1 {
+  font-size: clamp(25px, 4vw, 36px);
+  font-weight: 650;
+  margin: 0 0 5px;
+}
+header p {
+  margin: 0;
+  color: #c6deda;
+}
+main {
+  max-width: 1600px;
+  margin: auto;
+  padding: 22px clamp(16px, 3vw, 42px);
+}
+.toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.toolbar button,
+.stories button {
+  border: 1px solid #c3d4cd;
+  background: #fff;
+  padding: 9px 15px;
+  border-radius: 9px;
+}
+.toolbar button[aria-pressed='true'] {
+  background: #245951;
+  color: white;
+}
+.toolbar label {
+  margin-left: auto;
+}
+.toolbar input {
+  padding: 9px 12px;
+  border: 1px solid #a7bdb4;
+  border-radius: 8px;
+  width: min(300px, 70vw);
+}
+.walkthrough {
+  background: #fff;
+  border: 1px solid #d7e1da;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.walkthrough h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+.walkthrough p {
+  margin: 0 0 16px;
+  color: #4a6667;
+}
+.journey {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.step {
+  position: relative;
+  padding: 15px;
+  border-radius: 10px;
+  background: #e8f0eb;
+  border: 1px solid #ccddd2;
+}
+.step strong {
+  display: block;
+}
+.step small {
+  display: block;
+  margin-top: 5px;
+}
+.step:not(:last-child)::after {
+  content: '→';
+  position: absolute;
+  right: -13px;
+  top: 14px;
+  font-weight: bold;
+  z-index: 1;
+}
+.return-note {
+  margin: 12px 0 0 !important;
+  font-size: 14px;
+}
+.stories {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+}
+.graph-panel,
+aside {
+  background: white;
+  border: 1px solid #d7e1da;
+  border-radius: 14px;
+  min-width: 0;
+}
+.graph-panel h2 {
+  font-size: 18px;
+  margin: 17px 20px 2px;
+}
+.legend {
+  margin: 0 20px 12px;
+  color: #526b6a;
+  font-size: 13px;
+}
+.graph-window {
+  overflow: auto;
+  border-top: 1px solid #e5ece7;
+  max-height: 740px;
+}
+.canvas {
+  position: relative;
+  min-width: 1200px;
+}
+.canvas svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #bed5cd;
+  border-left: 5px solid #338d7e;
+  border-radius: 8px;
+  width: 233px;
+  height: 55px;
+  padding: 6px 10px;
+  transition: opacity 0.12s;
+}
+.node strong {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.node small {
+  font-size: 10px;
+  color: #526b6a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node[data-layer='server'] {
+  border-left-color: #586fb1;
+}
+.node[data-layer='python'] {
+  border-left-color: #ae803a;
+}
+.node[data-layer='core'] {
+  border-left-color: #826498;
+}
+.node[aria-pressed='true'] {
+  background: #e4f2eb;
+  box-shadow: 0 0 0 2px #245951;
+}
+.node.dim {
+  opacity: 0.27;
+}
+.column-title {
+  position: absolute;
+  top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #405956;
+}
+.edge {
+  fill: none;
+  stroke: #a9beb6;
+  stroke-width: 1.5;
+}
+.edge.worker {
+  stroke-dasharray: 5 4;
+  stroke: #9d7433;
+}
+.edge.focus {
+  stroke: #245951;
+  stroke-width: 2.5;
+}
+.edge.dim {
+  opacity: 0.13;
+}
+aside {
+  padding: 20px;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+aside h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+aside p {
+  margin: 0 0 14px;
+}
+aside a {
+  color: #235e58;
+  overflow-wrap: anywhere;
+}
+aside code {
+  font-size: 12px;
+}
+aside h3 {
+  font-size: 15px;
+  margin: 20px 0 6px;
+}
+aside ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+aside li {
+  border-top: 1px solid #e0e8e3;
+  padding: 8px 0;
+}
+aside li button {
+  padding: 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  color: #245e58;
+  font-weight: 600;
+}
+aside li small {
+  display: block;
+  color: #596d6a;
+  font-size: 11px;
+}
+.empty {
+  padding: 25px;
+  color: #536963;
+}
+.count {
+  font-size: 13px;
+  color: #506a63;
+}
+.snapshot {
+  margin-top: 20px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: #536b64;
+}
+details {
+  margin-top: 20px;
+}
+details p {
+  max-width: 85ch;
+  color: #526966;
+}
+body[data-overview='true'] .node.dim {
+  opacity: 0.65;
+}
+body[data-overview='true'] .edge.dim {
+  opacity: 0.22;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 980px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  aside {
+    position: static;
+  }
+  .journey {
+    grid-template-columns: 1fr 1fr;
+  }
+  .step::after {
+    display: none;
+  }
+  .toolbar label {
+    margin-left: 0;
+  }
+  .graph-window {
+    max-height: 540px;
+  }
+}
+@media (max-width: 500px) {
+  .journey {
+    grid-template-columns: 1fr;
+  }
+  .walkthrough {
+    padding: 16px;
+  }
+  .toolbar {
+    align-items: stretch;
+  }
+  .toolbar label {
+    width: 100%;
+  }
+  .toolbar input {
+    width: 100%;
+  }
+  header {
+    padding: 22px 18px;
+  }
+}
+@media print {
+  .toolbar,
+  .stories {
+    display: none;
+  }
+  .workspace {
+    display: block;
+  }
+  .graph-window {
+    max-height: none;
+    overflow: visible;
+  }
+  .canvas {
+    transform: scale(0.68);
+    transform-origin: top left;
+  }
+  aside {
+    position: static;
+  }
+}
+
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>How Atlas Reader connects</h1>
+      <p>52 source files · 80 recorded relationships · works offline</p>
+    </header>
+    <main>
+      <nav class="toolbar" aria-label="Map views">
+        <button id="overview" type="button" aria-pressed="true">Overview</button
+        ><button id="files" type="button" aria-pressed="false">Files and connections</button
+        ><label
+          >Find a piece
+          <input type="search" placeholder="Try PDF, Canvas or Python" aria-label="Find a module"
+        /></label>
+      </nav>
+      <section class="walkthrough" aria-label="Request walkthrough">
+        <h2>One request, several clear responsibilities</h2>
+        <p>
+          This is a simplified explanation. The file map below shows the source relationships
+          separately.
+        </p>
+        <div class="journey">
+          <div class="step">
+            <strong>1. You use the screen</strong
+            ><small>Browser code handles clicks, pages and read aloud.</small>
+          </div>
+          <div class="step">
+            <strong>2. The browser asks</strong
+            ><small>The API client sends an HTTP request to the local server.</small>
+          </div>
+          <div class="step">
+            <strong>3. The server checks and routes</strong
+            ><small>It validates the request and chooses the right feature.</small>
+          </div>
+          <div class="step">
+            <strong>4. A focused job runs</strong
+            ><small
+              >Python handles supported document, retrieval and study work through fixed
+              bridges.</small
+            >
+          </div>
+          <div class="step">
+            <strong>5. The screen updates</strong
+            ><small>The result returns through the server to the browser.</small>
+          </div>
+        </div>
+        <p class="return-note">
+          JavaScript connects the interface and server. Python handles focused document jobs. The
+          TypeScript AI runner is an optional, explicitly enabled path.
+        </p>
+        <div class="stories" aria-label="Feature walkthroughs"></div>
+      </section>
+      <div class="workspace">
+        <section class="graph-panel" aria-label="Reader file relationships">
+          <h2>Select a piece to see what uses it</h2>
+          <p class="legend">
+            Solid arrow: source import. Dashed arrow: verified worker declaration. Highlighting is
+            navigation, not a recorded execution trace.
+          </p>
+          <div class="graph-window" tabindex="0" aria-label="Scrollable source map">
+            <div class="canvas"></div>
+          </div>
+          <p class="count" role="status" style="margin: 12px 20px"></p>
+        </section>
+        <aside aria-label="Selected module"></aside>
+      </div>
+      <details>
+        <summary>What this map can and cannot tell you</summary>
+        <p>
+          The explanation above describes the app’s design. The arrows below come from parsed
+          JavaScript/TypeScript and Python imports, plus source-verified worker declarations. They
+          do not prove live provider access or full runtime data flow. Dynamic calls and unsupported
+          source locations remain unknown. Source line evidence is shown for each link. This page
+          contains paths and map metadata only, never documents, tokens or source text.
+        </p>
+      </details>
+    </main>
+    <script>(function explorerApp(window, document, data) {
+  const nodes = data.nodes;
+  const byId = new Map(nodes.map((node) => [node.file, node]));
+  let selected = nodes.find((node) => node.file === 'src/client/app.mjs')?.file || nodes[0]?.file;
+  let overview = true;
+  let storyNodes = [];
+  const canvas = document.querySelector('.canvas');
+  const panel = document.querySelector('aside');
+  const query = document.querySelector('input');
+  const count = document.querySelector('.count');
+  const overviewButton = document.querySelector('#overview');
+  const filesButton = document.querySelector('#files');
+  const el = (tag, text, className) => {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  };
+  const line = (edge) =>
+    edge.line ||
+    edge.locations?.map((site) => site.line).join(', ') ||
+    edge.locationStatus ||
+    'location unknown';
+  function select(file) {
+    selected = file;
+    render();
+  }
+  function list(title, edges, incoming) {
+    panel.append(el('h3', title));
+    if (!edges.length) {
+      panel.append(el('p', 'No recorded internal link.'));
+      return;
+    }
+    const ul = el('ul');
+    for (const edge of edges) {
+      const file = incoming ? edge.from : edge.to;
+      const li = el('li'),
+        control = el('button', byId.get(file)?.label || file);
+      control.type = 'button';
+      control.onclick = () => {
+        overview = false;
+        storyNodes = [];
+        select(file);
+      };
+      li.append(
+        control,
+        el(
+          'small',
+          `${edge.kind === 'declared-worker' ? 'Declared worker' : 'Source import'} · ${edge.from} · line ${line(edge)}`,
+        ),
+      );
+      ul.append(li);
+    }
+    panel.append(ul);
+  }
+  function render() {
+    document.body.dataset.overview = String(overview);
+    document.querySelector('.walkthrough').hidden = !overview;
+    overviewButton.setAttribute('aria-pressed', String(overview));
+    filesButton.setAttribute('aria-pressed', String(!overview));
+    const term = query.value.toLowerCase().trim();
+    const visible = nodes.filter((node) =>
+      (node.label + ' ' + node.file).toLowerCase().includes(term),
+    );
+    const adjacent = new Set([selected, ...storyNodes]);
+    for (const edge of data.edges) {
+      if (edge.from === selected) adjacent.add(edge.to);
+      if (edge.to === selected) adjacent.add(edge.from);
+    }
+    const positions = new Map(),
+      groups = ['client', 'server', 'python', 'core'];
+    const groupNames = [
+      'Browser · what you see',
+      'Local server · coordination',
+      'Python · document jobs',
+      'Optional AI · TypeScript',
+    ];
+    const max = Math.max(
+      1,
+      ...groups.map((group) => visible.filter((node) => node.layer === group).length),
+    );
+    canvas.style.height = `${max * 65 + 70}px`;
+    const previousFocus = document.activeElement?.dataset.file;
+    canvas.replaceChildren();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '1200');
+    svg.setAttribute('height', String(max * 65 + 70));
+    svg.setAttribute('aria-hidden', 'true');
+    const defs = document.createElementNS(svg.namespaceURI, 'defs');
+    const marker = document.createElementNS(svg.namespaceURI, 'marker');
+    marker.id = 'arrow';
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '9');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '5');
+    marker.setAttribute('markerHeight', '5');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    const arrow = document.createElementNS(svg.namespaceURI, 'path');
+    arrow.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+    arrow.setAttribute('fill', '#638878');
+    marker.append(arrow);
+    defs.append(marker);
+    svg.append(defs);
+    canvas.append(svg);
+    groups.forEach((group, column) => {
+      const label = el('div', groupNames[column], 'column-title');
+      label.style.left = `${column * 275 + 55}px`;
+      canvas.append(label);
+      visible
+        .filter((node) => node.layer === group)
+        .forEach((node, row) =>
+          positions.set(node.file, { x: column * 275 + 55, y: row * 65 + 44 }),
+        );
+    });
+    for (const edge of data.edges) {
+      const a = positions.get(edge.from),
+        b = positions.get(edge.to);
+      if (!a || !b) continue;
+      const focus =
+        edge.from === selected ||
+        edge.to === selected ||
+        (storyNodes.includes(edge.from) && storyNodes.includes(edge.to));
+      const path = document.createElementNS(svg.namespaceURI, 'path');
+      const forward = b.x > a.x,
+        startX = forward ? a.x + 233 : a.x,
+        endX = forward || a.x === b.x ? b.x : b.x + 233;
+      const control = a.x === b.x ? a.x - 18 - (Math.abs(a.y - b.y) % 31) : (startX + endX) / 2;
+      path.setAttribute(
+        'd',
+        `M${startX},${a.y + 27} C${control},${a.y + 27} ${control},${b.y + 27} ${endX},${b.y + 27}`,
+      );
+      path.setAttribute(
+        'class',
+        `edge ${edge.kind === 'declared-worker' ? 'worker' : ''} ${focus ? 'focus' : 'dim'}`,
+      );
+      path.setAttribute('marker-end', 'url(#arrow)');
+      path.dataset.to = edge.to;
+      svg.append(path);
+    }
+    for (const node of visible) {
+      const p = positions.get(node.file),
+        button = el('button', undefined, 'node' + (adjacent.has(node.file) ? '' : ' dim'));
+      button.type = 'button';
+      button.dataset.file = node.file;
+      button.dataset.layer = node.layer;
+      button.setAttribute('aria-pressed', String(node.file === selected));
+      button.setAttribute('aria-label', `${node.label} — ${node.file}`);
+      button.style.left = `${p.x}px`;
+      button.style.top = `${p.y}px`;
+      button.append(el('strong', node.label), el('small', node.file.replace(/^src\//, '')));
+      button.onclick = () => select(node.file);
+      canvas.append(button);
+      if (previousFocus === node.file)
+        window.requestAnimationFrame(() => button.focus({ preventScroll: true }));
+    }
+    if (!visible.length)
+      canvas.append(el('p', 'No matching file. Try “Python”, “Canvas” or “PDF”.', 'empty'));
+    count.textContent = `${visible.length} of ${nodes.length} files shown · arrows point toward the module being used`;
+    panel.replaceChildren();
+    const node = byId.get(selected);
+    if (!node) return;
+    panel.append(el('h2', node.label), el('p', node.description));
+    const source = el('a');
+    source.href = '../' + node.file;
+    source.append(el('code', node.file));
+    panel.append(source);
+    list(
+      'Uses →',
+      data.edges.filter((edge) => edge.from === selected),
+      false,
+    );
+    list(
+      'Used by ←',
+      data.edges.filter((edge) => edge.to === selected),
+      true,
+    );
+    const identity = el(
+      'p',
+      `Source snapshot ${data.fingerprint.slice(0, 16)}. Regenerate with npm run map.`,
+      'snapshot',
+    );
+    panel.append(identity);
+  }
+  overviewButton.onclick = () => {
+    overview = true;
+    storyNodes = [];
+    render();
+  };
+  filesButton.onclick = () => {
+    overview = false;
+    storyNodes = [];
+    render();
+  };
+  query.oninput = () => {
+    overview = false;
+    storyNodes = [];
+    render();
+  };
+  for (const [label, files] of data.stories) {
+    const button = el('button', label);
+    button.type = 'button';
+    button.onclick = () => {
+      overview = false;
+      query.value = '';
+      storyNodes = files;
+      select(files[0]);
+      document.querySelector('.graph-panel').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    };
+    document.querySelector('.stories').append(button);
+  }
+  render();
+})(window,document,{"nodes":[{"file":"src/client/api.mjs","label":"Browser requests","description":"Sends requests to Reader’s local server and handles its session and errors.","layer":"client"},{"file":"src/client/app.mjs","label":"Reading screen","description":"Coordinates the buttons, reading view and document workspace you interact with.","layer":"client"},{"file":"src/client/appearance-preview.mjs","label":"appearance-preview.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/builder-ui.mjs","label":"builder-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/canvas-display.mjs","label":"canvas-display.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/canvas-ui.mjs","label":"Canvas course panel","description":"Displays courses and assignments and connects their controls to the reading workspace.","layer":"client"},{"file":"src/client/chat-format.mjs","label":"chat-format.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/connections-ui.mjs","label":"connections-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/course-study-ui.mjs","label":"course-study-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/customization-drawer.mjs","label":"customization-drawer.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/customization.mjs","label":"customization.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/documents.mjs","label":"Document controls","description":"Handles document selection, display and related browser interactions.","layer":"client"},{"file":"src/client/loading-ui.mjs","label":"loading-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/memory-ui.mjs","label":"memory-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/pdf-workspace.mjs","label":"PDF workspace","description":"Displays PDF pages and keeps their reading position and selection together.","layer":"client"},{"file":"src/client/resources-ui.mjs","label":"resources-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/roger-navigation.mjs","label":"roger-navigation.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/roger-widget.mjs","label":"roger-widget.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/speech.mjs","label":"Read aloud","description":"Controls the browser’s reading voice, playback and cancellation.","layer":"client"},{"file":"src/client/study-ui.mjs","label":"study-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/client/submission-ui.mjs","label":"Submission form","description":"Collects the user’s assignment submission choices.","layer":"client"},{"file":"src/client/syllabus-ui.mjs","label":"syllabus-ui.mjs","description":"A source module in the current generated dependency map.","layer":"client"},{"file":"src/core/cli-protocol.ts","label":"Optional AI protocol","description":"Validates the text-only CLI request and response format for the explicitly enabled AI path.","layer":"core"},{"file":"src/core/cli-runner.ts","label":"Optional AI runner","description":"Runs that consented CLI request with its existing isolation and cancellation controls.","layer":"core"},{"file":"src/python/canvas_records.py","label":"Canvas record cleanup","description":"Converts allowed Canvas responses into the app’s consistent data shapes.","layer":"python"},{"file":"src/python/common.py","label":"Python validation","description":"Supplies shared validation, size limits and structured errors.","layer":"python"},{"file":"src/python/exam_plan.py","label":"exam_plan.py","description":"A source module in the current generated dependency map.","layer":"python"},{"file":"src/python/presentation.py","label":"Presentation writer","description":"Creates presentation output from the supplied bounded input.","layer":"python"},{"file":"src/python/retrieval.py","label":"Passage matching","description":"Finds relevant material inside the supplied text without inventing missing source content.","layer":"python"},{"file":"src/python/study.py","label":"Study preparation","description":"Prepares and validates source-bound reading and study material.","layer":"python"},{"file":"src/python/study_sets.py","label":"study_sets.py","description":"A source module in the current generated dependency map.","layer":"python"},{"file":"src/python/syllabus.py","label":"syllabus.py","description":"A source module in the current generated dependency map.","layer":"python"},{"file":"src/python/worker.py","label":"Python job dispatcher","description":"Reads one allowed JSON job, calls the correct Python function and returns its result.","layer":"python"},{"file":"src/server/appearance-builder.mjs","label":"appearance-builder.mjs","description":"A source module in the current generated dependency map.","layer":"server"},{"file":"src/server/builder.mjs","label":"builder.mjs","description":"A source module in the current generated dependency map.","layer":"server"},{"file":"src/server/canvas-download.mjs","label":"Canvas downloads","description":"Retrieves permitted course files with the existing download checks.","layer":"server"},{"file":"src/server/canvas.mjs","label":"Canvas adapter","description":"Coordinates the allowed Canvas reads and normalizes their results.","layer":"server"},{"file":"src/server/connections.mjs","label":"connections.mjs","description":"A source module in the current generated dependency map.","layer":"server"},{"file":"src/server/course-export.mjs","label":"course-export.mjs","description":"A source module in the current generated dependency map.","layer":"server"},{"file":"src/server/document-processing.mjs","label":"Document processing","description":"Coordinates supported document extraction and conversion jobs.","layer":"server"},{"file":"src/server/http.mjs","label":"Request router","description":"Receives browser requests and sends each one to its feature handler.","layer":"server"},{"file":"src/server/index.mjs","label":"Start the app","description":"The small entry point that starts the local HTTP server.","layer":"server"},{"file":"src/server/memory.mjs","label":"memory.mjs","description":"A source module in the current generated dependency map.","layer":"server"},{"file":"src/server/narration.mjs","label":"narration.mjs","description":"A source module in the current generated dependency map.","layer":"server"},{"file":"src/server/owner-canvas.mjs","label":"Canvas configuration","description":"Loads this app’s explicitly provisioned Canvas configuration on the server.","layer":"server"},{"file":"src/server/python-domain.mjs","label":"Python bridge","description":"Runs fixed, allowlisted Python jobs using bounded JSON messages and cancellation.","layer":"server"},{"file":"src/server/python-presentation.mjs","label":"Presentation bridge","description":"Coordinates the Python presentation-writing worker.","layer":"server"},{"file":"src/server/retrieval.mjs","label":"Find relevant passages","description":"Passes a bounded document question to the Python retrieval job.","layer":"server"},{"file":"src/server/security.mjs","label":"Request checks","description":"Checks origins, sessions and request limits before protected actions proceed.","layer":"server"},{"file":"src/server/study.mjs","label":"Study service","description":"Coordinates study preparation and the optional, consented AI path.","layer":"server"},{"file":"src/server/submissions.mjs","label":"Submission service","description":"Handles the existing submission workflow on the server.","layer":"server"},{"file":"src/server/web-resources.mjs","label":"web-resources.mjs","description":"A source module in the current generated dependency map.","layer":"server"}],"edges":[{"from":"src/client/app.mjs","to":"src/client/api.mjs","kind":"js-import","locations":[{"specifier":"/client/api.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/appearance-preview.mjs","kind":"js-import","locations":[{"specifier":"/client/appearance-preview.mjs","line":20,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/builder-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/builder-ui.mjs","line":18,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/canvas-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/canvas-ui.mjs","line":14,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/chat-format.mjs","kind":"js-import","locations":[{"specifier":"/client/chat-format.mjs","line":21,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/connections-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/connections-ui.mjs","line":17,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/customization-drawer.mjs","kind":"js-import","locations":[{"specifier":"/client/customization-drawer.mjs","line":19,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/customization.mjs","kind":"js-import","locations":[{"specifier":"/client/customization.mjs","line":15,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/documents.mjs","kind":"js-import","locations":[{"specifier":"/client/documents.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/memory-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/memory-ui.mjs","line":22,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/pdf-workspace.mjs","kind":"js-import","locations":[{"specifier":"/client/pdf-workspace.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/resources-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/resources-ui.mjs","line":24,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/roger-navigation.mjs","kind":"js-import","locations":[{"specifier":"/client/roger-navigation.mjs","line":23,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/roger-widget.mjs","kind":"js-import","locations":[{"specifier":"/client/roger-widget.mjs","line":16,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/app.mjs","to":"src/client/speech.mjs","kind":"js-import","locations":[{"specifier":"/client/speech.mjs","line":4,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/canvas-ui.mjs","to":"src/client/canvas-display.mjs","kind":"js-import","locations":[{"specifier":"/client/canvas-display.mjs","line":6,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/canvas-ui.mjs","to":"src/client/course-study-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/course-study-ui.mjs","line":5,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/canvas-ui.mjs","to":"src/client/loading-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/loading-ui.mjs","line":4,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/canvas-ui.mjs","to":"src/client/study-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/study-ui.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/canvas-ui.mjs","to":"src/client/submission-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/submission-ui.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/canvas-ui.mjs","to":"src/client/syllabus-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/syllabus-ui.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/course-study-ui.mjs","to":"src/client/study-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/study-ui.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/course-study-ui.mjs","to":"src/client/syllabus-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/syllabus-ui.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/memory-ui.mjs","to":"src/client/chat-format.mjs","kind":"js-import","locations":[{"specifier":"/client/chat-format.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/study-ui.mjs","to":"src/client/documents.mjs","kind":"js-import","locations":[{"specifier":"/client/documents.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/study-ui.mjs","to":"src/client/loading-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/loading-ui.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/study-ui.mjs","to":"src/client/syllabus-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/syllabus-ui.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/syllabus-ui.mjs","to":"src/client/api.mjs","kind":"js-import","locations":[{"specifier":"/client/api.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/syllabus-ui.mjs","to":"src/client/documents.mjs","kind":"js-import","locations":[{"specifier":"/client/documents.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/client/syllabus-ui.mjs","to":"src/client/loading-ui.mjs","kind":"js-import","locations":[{"specifier":"/client/loading-ui.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/core/cli-runner.ts","to":"src/core/cli-protocol.ts","kind":"js-import","locations":[],"locationStatus":"unknown; unsupported source language"},{"from":"src/python/canvas_records.py","to":"src/python/common.py","kind":"python-import","line":6},{"from":"src/python/exam_plan.py","to":"src/python/common.py","kind":"python-import","line":4},{"from":"src/python/retrieval.py","to":"src/python/common.py","kind":"python-import","line":6},{"from":"src/python/study_sets.py","to":"src/python/common.py","kind":"python-import","line":5},{"from":"src/python/study_sets.py","to":"src/python/study.py","kind":"python-import","line":6},{"from":"src/python/study.py","to":"src/python/common.py","kind":"python-import","line":4},{"from":"src/python/syllabus.py","to":"src/python/common.py","kind":"python-import","line":11},{"from":"src/python/worker.py","to":"src/python/canvas_records.py","kind":"python-import","line":13},{"from":"src/python/worker.py","to":"src/python/common.py","kind":"python-import","line":9},{"from":"src/python/worker.py","to":"src/python/exam_plan.py","kind":"python-import","line":15},{"from":"src/python/worker.py","to":"src/python/retrieval.py","kind":"python-import","line":10},{"from":"src/python/worker.py","to":"src/python/study_sets.py","kind":"python-import","line":12},{"from":"src/python/worker.py","to":"src/python/study.py","kind":"python-import","line":11},{"from":"src/python/worker.py","to":"src/python/syllabus.py","kind":"python-import","line":14},{"from":"src/server/appearance-builder.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/builder.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":6,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/canvas.mjs","to":"src/server/canvas-download.mjs","kind":"js-import","locations":[{"specifier":"./canvas-download.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/canvas.mjs","to":"src/server/python-domain.mjs","kind":"js-import","locations":[{"specifier":"./python-domain.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/connections.mjs","to":"src/core/cli-protocol.ts","kind":"js-import","locations":[{"specifier":"../core/cli-protocol.ts","line":6,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/connections.mjs","to":"src/core/cli-runner.ts","kind":"js-import","locations":[{"specifier":"../core/cli-runner.ts","line":5,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/course-export.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/document-processing.mjs","to":"src/server/python-presentation.mjs","kind":"js-import","locations":[{"specifier":"./python-presentation.mjs","line":6,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/appearance-builder.mjs","kind":"js-import","locations":[{"specifier":"./appearance-builder.mjs","line":23,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/builder.mjs","kind":"js-import","locations":[{"specifier":"./builder.mjs","line":22,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/canvas.mjs","kind":"js-import","locations":[{"specifier":"./canvas.mjs","line":16,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/connections.mjs","kind":"js-import","locations":[{"specifier":"./connections.mjs","line":21,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/course-export.mjs","kind":"js-import","locations":[{"specifier":"./course-export.mjs","line":26,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/document-processing.mjs","kind":"js-import","locations":[{"specifier":"./document-processing.mjs","line":14,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/memory.mjs","kind":"js-import","locations":[{"specifier":"./memory.mjs","line":25,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/narration.mjs","kind":"js-import","locations":[{"specifier":"./narration.mjs","line":20,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/python-domain.mjs","kind":"js-import","locations":[{"specifier":"./python-domain.mjs","line":19,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/retrieval.mjs","kind":"js-import","locations":[{"specifier":"./retrieval.mjs","line":18,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":5,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/study.mjs","kind":"js-import","locations":[{"specifier":"./study.mjs","line":17,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/submissions.mjs","kind":"js-import","locations":[{"specifier":"./submissions.mjs","line":15,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/http.mjs","to":"src/server/web-resources.mjs","kind":"js-import","locations":[{"specifier":"./web-resources.mjs","line":24,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/index.mjs","to":"src/server/http.mjs","kind":"js-import","locations":[{"specifier":"./http.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/index.mjs","to":"src/server/memory.mjs","kind":"js-import","locations":[{"specifier":"./memory.mjs","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/index.mjs","to":"src/server/owner-canvas.mjs","kind":"js-import","locations":[{"specifier":"./owner-canvas.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/memory.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":6,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/narration.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":7,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/python-domain.mjs","to":"src/python/worker.py","kind":"declared-worker","line":5},{"from":"src/server/python-presentation.mjs","to":"src/python/presentation.py","kind":"declared-worker","line":7},{"from":"src/server/retrieval.mjs","to":"src/server/python-domain.mjs","kind":"js-import","locations":[{"specifier":"./python-domain.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/study.mjs","to":"src/core/cli-protocol.ts","kind":"js-import","locations":[{"specifier":"../core/cli-protocol.ts","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/study.mjs","to":"src/core/cli-runner.ts","kind":"js-import","locations":[{"specifier":"../core/cli-runner.ts","line":2,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/study.mjs","to":"src/server/python-domain.mjs","kind":"js-import","locations":[{"specifier":"./python-domain.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/submissions.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":3,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"},{"from":"src/server/web-resources.mjs","to":"src/server/security.mjs","kind":"js-import","locations":[{"specifier":"./security.mjs","line":1,"column":1,"syntax":"ImportDeclaration"}],"locationStatus":"located"}],"fingerprint":"d5896dfec78b019154fbcbfc94beb7a97ed47a549ba4342084d393d2d918e476","stories":[["Ask about a document",["src/client/app.mjs","src/client/api.mjs","src/server/http.mjs","src/server/retrieval.mjs","src/server/python-domain.mjs","src/python/worker.py","src/python/retrieval.py"]],["Read a Canvas assignment",["src/client/canvas-ui.mjs","src/client/api.mjs","src/server/http.mjs","src/server/canvas.mjs","src/server/python-domain.mjs","src/python/worker.py","src/python/canvas_records.py"]],["Create a presentation",["src/client/app.mjs","src/client/api.mjs","src/server/http.mjs","src/server/document-processing.mjs","src/server/python-presentation.mjs","src/python/presentation.py"]]]});</script>
+  </body>
+</html>

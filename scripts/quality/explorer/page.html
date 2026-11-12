@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Atlas Reader — how the pieces connect</title>
+    <style>
+      /* EXPLORER_STYLE */
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>How Atlas Reader connects</h1>
+      <p>{{FILE_COUNT}} source files · {{LINK_COUNT}} recorded relationships · works offline</p>
+    </header>
+    <main>
+      <nav class="toolbar" aria-label="Map views">
+        <button id="overview" type="button" aria-pressed="true">Overview</button
+        ><button id="files" type="button" aria-pressed="false">Files and connections</button
+        ><label
+          >Find a piece
+          <input type="search" placeholder="Try PDF, Canvas or Python" aria-label="Find a module"
+        /></label>
+      </nav>
+      <section class="walkthrough" aria-label="Request walkthrough">
+        <h2>One request, several clear responsibilities</h2>
+        <p>
+          This is a simplified explanation. The file map below shows the source relationships
+          separately.
+        </p>
+        <div class="journey">
+          <div class="step">
+            <strong>1. You use the screen</strong
+            ><small>Browser code handles clicks, pages and read aloud.</small>
+          </div>
+          <div class="step">
+            <strong>2. The browser asks</strong
+            ><small>The API client sends an HTTP request to the local server.</small>
+          </div>
+          <div class="step">
+            <strong>3. The server checks and routes</strong
+            ><small>It validates the request and chooses the right feature.</small>
+          </div>
+          <div class="step">
+            <strong>4. A focused job runs</strong
+            ><small
+              >Python handles supported document, retrieval and study work through fixed
+              bridges.</small
+            >
+          </div>
+          <div class="step">
+            <strong>5. The screen updates</strong
+            ><small>The result returns through the server to the browser.</small>
+          </div>
+        </div>
+        <p class="return-note">
+          JavaScript connects the interface and server. Python handles focused document jobs. The
+          TypeScript AI runner is an optional, explicitly enabled path.
+        </p>
+        <div class="stories" aria-label="Feature walkthroughs"></div>
+      </section>
+      <div class="workspace">
+        <section class="graph-panel" aria-label="Reader file relationships">
+          <h2>Select a piece to see what uses it</h2>
+          <p class="legend">
+            Solid arrow: source import. Dashed arrow: verified worker declaration. Highlighting is
+            navigation, not a recorded execution trace.
+          </p>
+          <div class="graph-window" tabindex="0" aria-label="Scrollable source map">
+            <div class="canvas"></div>
+          </div>
+          <p class="count" role="status" style="margin: 12px 20px"></p>
+        </section>
+        <aside aria-label="Selected module"></aside>
+      </div>
+      <details>
+        <summary>What this map can and cannot tell you</summary>
+        <p>
+          The explanation above describes the app’s design. The arrows below come from parsed
+          JavaScript/TypeScript and Python imports, plus source-verified worker declarations. They
+          do not prove live provider access or full runtime data flow. Dynamic calls and unsupported
+          source locations remain unknown. Source line evidence is shown for each link. This page
+          contains paths and map metadata only, never documents, tokens or source text.
+        </p>
+      </details>
+    </main>
+    <!-- EXPLORER_SCRIPT -->
+  </body>
+</html>

@@ -1,0 +1,44 @@
+.resources-form {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: end;
+  margin: 1.5rem 0;
+}
+.resources-form label {
+  width: 100%;
+}
+.resources-form input {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.resource-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 1rem;
+}
+.resource-card {
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.resource-card h3 {
+  margin: 0 0 0.6rem;
+}
+.resource-card p {
+  margin: 0.4rem 0;
+}
+.resource-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+.resource-catalogs {
+  margin: 1.8rem 0;
+}

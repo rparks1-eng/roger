@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "sourceProject": "Atlas Product/Source",
+  "policy": "Reviewed source snapshot, not a live import. Never copy application state, environment files, credentials, uploads, or personal content. Refresh explicitly with this allowlist script.",
+  "files": [
+    {
+      "source": "src/lib/study/cli-runner.ts",
+      "destination": "src/core/cli-runner.ts",
+      "sourceSha256": "ae4147f3e26d3fea0140f4a10aee58a5a91c4b5d5cc893f0214bebe51066786d",
+      "destinationSha256": "91c9b7322c9ed37f020755a25dc441b2277a5361b487dda21671aaf4016f4503",
+      "transformations": [
+        "Add explicit .ts extension to cli-protocol import for native Node type stripping."
+      ]
+    },
+    {
+      "source": "src/lib/study/cli-protocol.ts",
+      "destination": "src/core/cli-protocol.ts",
+      "sourceSha256": "d07cbbcf45767af40ea4f19253f6853aba07822e71507eafe616b63869359db7",
+      "destinationSha256": "d07cbbcf45767af40ea4f19253f6853aba07822e71507eafe616b63869359db7",
+      "transformations": []
+    }
+  ]
+}

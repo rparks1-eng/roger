@@ -1,0 +1,104 @@
+#roger-atmosphere {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.environment-motif {
+  position: absolute;
+  opacity: 0.17;
+  user-select: none;
+}
+[data-generated-appearance] body > main,
+[data-generated-appearance] body > header {
+  position: relative;
+  z-index: 1;
+}
+[data-generated-appearance] .canvas-course-card,
+[data-generated-appearance] .button,
+[data-generated-appearance] .reading-card,
+[data-generated-appearance] .connection-card,
+[data-generated-appearance] .canvas-connected {
+  border-radius: var(--environment-radius);
+}
+[data-generated-appearance] .canvas-course-card:nth-child(n) {
+  color: var(--ink);
+}
+[data-generated-appearance] input,
+[data-generated-appearance] textarea,
+[data-generated-appearance] select {
+  background: var(--surface);
+  color: var(--ink);
+}
+[data-generated-appearance] .paper {
+  background: #fff;
+}
+#roger-atmosphere[data-motion='float'] .environment-motif {
+  animation: environment-float 8s ease-in-out infinite alternate;
+}
+#roger-atmosphere[data-motion='bounce'] .environment-motif {
+  animation: environment-bounce 6s ease-in-out infinite;
+}
+#roger-atmosphere[data-motion='drift'] .environment-motif {
+  animation: environment-drift 10s ease-in-out infinite alternate;
+}
+@keyframes environment-float {
+  to {
+    transform: translateY(-30px) rotate(12deg);
+  }
+}
+@keyframes environment-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-45px) scale(1.05);
+  }
+}
+@keyframes environment-drift {
+  to {
+    transform: translate(60px, -25px) rotate(-10deg);
+  }
+}
+.appearance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.8rem 0;
+}
+#appearance-request {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+}
+.appearance-preview-notice {
+  position: fixed;
+  z-index: 700;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 28px));
+  padding: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 18px;
+  box-shadow: 0 8px 28px #0002;
+}
+.appearance-preview-notice span {
+  flex: 1;
+  font-size: 0.85rem;
+  min-width: 180px;
+}
+@media (prefers-reduced-motion: reduce) {
+  #roger-atmosphere .environment-motif {
+    animation: none !important;
+    will-change: auto;
+  }
+}

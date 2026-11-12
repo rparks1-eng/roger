@@ -1,0 +1,10 @@
+node_modules/
+.venv/
+public/vendor/
+public/assets/
+src/core/
+migration/
+engineering/
+architecture/
+package-lock.json
+*.md

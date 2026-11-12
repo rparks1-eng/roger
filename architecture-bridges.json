@@ -1,0 +1,12 @@
+[
+  [
+    "src/server/python-domain.mjs",
+    "src/python/worker.py",
+    "../python/worker.py"
+  ],
+  [
+    "src/server/python-presentation.mjs",
+    "src/python/presentation.py",
+    "../python/presentation.py"
+  ]
+]

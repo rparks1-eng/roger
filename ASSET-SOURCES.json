@@ -1,0 +1,66 @@
+{
+  "snapshot": true,
+  "files": [
+    {
+      "source": "Atlas Product/Browser Shell/ui/assets/mora.png",
+      "destination": "public/assets/mora.png",
+      "purpose": "Original Atlas Mora artwork",
+      "bytes": 1995480,
+      "sha256": "0e3c7bcfa2e21e1fa946389d98f98c9a7a675cd34a377a27a428c4d16094e6f6"
+    },
+    {
+      "source": "Atlas Product/Source/node_modules/pdfjs-dist/build/pdf.mjs",
+      "destination": "public/vendor/pdf.mjs",
+      "purpose": "Mozilla PDF.js display library",
+      "bytes": 860384,
+      "sha256": "495588717f62303a839e91a5343deebf1b41f52e2f9f6361e73dee6ea6a4355e"
+    },
+    {
+      "source": "Atlas Product/Source/node_modules/pdfjs-dist/build/pdf.worker.mjs",
+      "destination": "public/vendor/pdf.worker.mjs",
+      "purpose": "Mozilla PDF.js worker",
+      "bytes": 2228489,
+      "sha256": "f2870db902eaff8397442c912b69459980ac91f6f4b5ed827167b12cf7057930"
+    },
+    {
+      "source": "Atlas Product/Source/node_modules/pdfjs-dist/LICENSE",
+      "destination": "public/vendor/PDFJS-LICENSE.txt",
+      "purpose": "Mozilla PDF.js Apache 2.0 license",
+      "bytes": 10174,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    }
+  ],
+  "originalCharacters": [
+    {
+      "destination": "public/assets/roger.png",
+      "purpose": "Ask Roger study companion",
+      "created": "2026-11-11",
+      "method": "Original transparent gouache illustration generated for Atlas Reader at user request",
+      "sha256": "cb9e5e09218a33e78b7addc80f121e7a5cce3fc38335a58b9816f6411def3367",
+      "reference": "https://entrepreneurship.babson.edu/people-of-babson-kevin-carrigan/",
+      "identity": "English cream golden retriever; inspired character, not an official college asset"
+    },
+    {
+      "destination": "public/assets/beaver.png",
+      "purpose": "Atlas Reader beaver identity",
+      "created": "2026-11-11",
+      "method": "Original transparent gouache illustration generated for Atlas Reader at user request",
+      "sha256": "a90c644897a820554774d2f11503c7dcd9c59194b928c34966c2968144d47342"
+    },
+    {
+      "destination": "public/assets/roger-peek.png",
+      "purpose": "Simple cartoon Roger head and paws for floating chat bar",
+      "created": "2026-11-11",
+      "method": "Original transparent image generated for the user-requested peeking interaction",
+      "sha256": "1585341d7b397ac429a41c9b9d637483663fa9ba1c0abc21888bd5a63e694398"
+    },
+    {
+      "destination": "public/assets/beaver-simple.png",
+      "purpose": "Darker-brown simpler cartoon beaver, secondary Roger character",
+      "created": "2026-11-11",
+      "method": "Original transparent image generated following user correction",
+      "sha256": "ee9cf99f4e0c49e593b0bdcdf332cc2eddbfe99375eca8eec3abe85ed428676e"
+    }
+  ],
+  "sourceLabels": "Source paths are archive-relative provenance labels, not runtime dependencies. Vendored destinations and hashes identify the included files."
+}

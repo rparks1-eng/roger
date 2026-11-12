@@ -1,0 +1,33 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.DS_Store
+*.log
+coverage/
+test-results/
+playwright-report/
+__pycache__/
+*.py[cod]
+
+.venv/
+.ruff_cache/
+engineering/before.zip
+
+# Local audit/history and personal demonstration evidence stay on this computer.
+engineering/
+migration/
+Planning/
+CHECKPOINT.md
+Engineering Checks.md
+scripts/reuse-owner-canvas.mjs
+# Runtime data must never enter the source repository.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.wav
+*.mp3
+*.mp4
+canvas-owner.json
+feature-library.json

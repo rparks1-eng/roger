@@ -1,0 +1,41 @@
+.memory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.3rem 0;
+}
+.memory-turn {
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 16px;
+  margin: 0.7rem 0;
+}
+.memory-turn p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.memory-turn small {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--muted);
+}
+.memory-turn a {
+  display: block;
+}
+.memory-preference {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 650px;
+  margin: 1.5rem 0;
+}
+.memory-preference textarea {
+  min-height: 90px;
+  padding: 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}

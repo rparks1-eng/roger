@@ -1,0 +1,19 @@
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+exclude = [".venv", "migration", "engineering"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "TID251"]
+
+[tool.ruff.lint.per-file-ignores]
+# These entry points add only their owned Python source directory before imports.
+"src/python/worker.py" = ["E402"]
+"tests/test_*.py" = ["E402"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"socket" = { msg = "Python domain jobs must not open network connections." }
+"subprocess" = { msg = "Process authority belongs to the server adapters." }
+"urllib" = { msg = "Network authority belongs to the server adapters." }
+"http" = { msg = "Network authority belongs to the server adapters." }
+"requests" = { msg = "Network authority belongs to the server adapters." }
