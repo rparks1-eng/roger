@@ -55,6 +55,7 @@ export function mountRogerWidget({
   root,
   onOpen = () => {},
   onClose = () => {},
+  getBottomInset = () => 0,
   storage,
   host = window,
 }) {
@@ -79,7 +80,10 @@ export function mountRogerWidget({
   const removers = [];
   const viewport = () => ({
     width: host.visualViewport?.width || host.innerWidth,
-    height: host.visualViewport?.height || host.innerHeight,
+    height: Math.max(
+      PAW_SIZE + MARGIN * 2,
+      (host.visualViewport?.height || host.innerHeight) - getBottomInset(),
+    ),
   });
   const listen = (target, type, handler, options) => {
     target.addEventListener(type, handler, options);

@@ -52,6 +52,7 @@ try {
     });
   });
   await page.goto(base);
+  await page.locator('.primary-nav [data-view=library]').click();
   await page.locator('#upload-inline').waitFor();
   assert.equal(await page.locator('.sidebar,.brand-mark').count(), 0);
   checks++;
@@ -191,6 +192,7 @@ try {
   await page.locator('#back-library').click();
   await page.screenshot({ path: path.join(output, 'library-mobile.png'), fullPage: true });
   await page.reload();
+  await page.locator('.primary-nav [data-view=library]').click();
   await page.locator('#library-empty').waitFor();
   assert.equal(await page.locator('.reading-card').count(), 0);
   checks++;
@@ -328,7 +330,8 @@ try {
   await page.route('**/api/canvas/disconnect', (route) =>
     route.fulfill({ json: { disconnected: true } }),
   );
-  await page.locator('.primary-nav [data-view="courses"]').click();
+  await page.locator('.rail-main [data-view=courses]').click();
+  await page.locator('#canvas-setup [data-view=settings]').click();
   await page.locator('#canvas-token').fill('synthetic-owner-test-token');
   await page.locator('#canvas-connect button').click();
   await page
@@ -406,7 +409,8 @@ try {
   checks++;
   assert.ok((await page.locator('#document-text').textContent()).includes('independently'));
   checks++;
-  await page.locator('.primary-nav [data-view="courses"]').click();
+  await page.locator('#rail-more summary').click();
+  await page.locator('.primary-nav [data-view=settings]').click();
   await page.locator('#canvas-disconnect').click();
   await page.locator('#canvas-status').filter({ hasText: 'Not connected' }).waitFor();
   assert.equal(await page.locator('#course-list').textContent(), '');

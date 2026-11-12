@@ -19,7 +19,7 @@ for (const [relative] of readerAssets.values()) {
 }
 const beforeHTML = await readFile(path.join(checkout, 'public/index.html'), 'utf8');
 const beforeJS = await readFile(path.join(checkout, 'src/client/app.mjs'), 'utf8');
-const originalHeading = '<h1 id="library-heading">Library<span class="heading-dot">.</span></h1>';
+const originalHeading = '<h1 id="library-heading">Readings<span class="heading-dot">.</span></h1>';
 const lastLine =
   "start().catch((error) => status(error.message || 'Reload Atlas Reader to start again.'));";
 const plan = {
@@ -128,7 +128,7 @@ try {
     false,
   );
   assert.equal(await preview.evaluate(() => localStorage.getItem('private-fixture')), null);
-  await preview.getByRole('button', { name: 'Library', exact: true }).click();
+  await preview.getByRole('button', { name: 'Readings', exact: true }).click();
   await preview.locator('#library-heading').filter({ hasText: 'Reading desk' }).waitFor();
   await preview.getByRole('button', { name: 'Complete checkpoint', exact: true }).click();
   assert.equal(await preview.locator('#checkpoint-count').textContent(), '1 checkpoints');
@@ -149,6 +149,7 @@ try {
   await page.locator('.app-change-status').filter({ hasText: 'App files updated' }).waitFor();
   assert.notEqual(await readFile(path.join(checkout, 'public/index.html'), 'utf8'), beforeHTML);
   await page.reload();
+  await page.getByRole('button', { name: 'Readings', exact: true }).click();
   await page.getByRole('button', { name: 'Complete checkpoint', exact: true }).click();
   assert.equal(
     await page.locator('#checkpoint-count').textContent(),

@@ -264,7 +264,7 @@ try {
   await page.locator('#builder-request').fill('SLOW_FIXTURE revision');
   await page.locator('#builder-view button[type="submit"]').click();
   await boundedWait(slowStarted, 'Slow generation start');
-  await page.getByRole('button', { name: 'Library', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Readings', exact: true }).first().click();
   await boundedWait(slowAborted, 'Leave cancellation');
   assert.equal(await page.locator('.feature-frame').count(), 0);
   assert.equal(await page.locator('#builder-view').isVisible(), false);

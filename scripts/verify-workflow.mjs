@@ -84,6 +84,7 @@ try {
     return route.fulfill({ contentType: 'audio/wav', body: narrationWav });
   });
   await page.goto(origin);
+  await page.locator('.primary-nav [data-view=library]').click();
   await page.locator('#upload-inline').waitFor();
   for (const asset of ['roger', 'roger-peek', 'beaver']) {
     const image = await page.request.get(`${origin}/assets/${asset}.png`);

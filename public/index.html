@@ -18,45 +18,68 @@
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <div class="app-shell">
-      <header class="app-header">
-        <a class="brand" href="/" aria-label="Roger home"
-          ><img
-            class="brand-beaver"
-            src="/assets/roger-peek.png"
-            width="56"
-            height="56"
-            alt=""
-          />Roger</a
-        >
+      <aside class="app-rail" aria-label="Roger navigation">
+        <a class="brand" href="/" aria-label="Roger home">
+          <img class="brand-beaver" src="/assets/roger-peek.png" width="46" height="46" alt="" />
+          Roger
+        </a>
         <nav class="primary-nav" aria-label="Main">
-          <button class="nav-button active" data-view="library" aria-current="page">Library</button>
-          <button class="nav-button" data-view="courses">Courses</button>
-          <button class="nav-button" data-view="builder">Your tools</button>
-          <button
-            class="nav-button"
-            id="customize-toggle"
-            aria-haspopup="dialog"
-            aria-expanded="false"
-          >
-            Appearance
-          </button>
-          <button class="nav-button" data-view="resources">Find books</button>
-          <button class="nav-button" data-view="memory">Conversations</button>
-          <button class="nav-button" data-view="connections">AI connections</button>
+          <div class="rail-main">
+            <button class="nav-button active" data-view="courses" aria-current="page">
+              <span aria-hidden="true">◉</span>Today
+            </button>
+            <button class="nav-button" data-view="planner">
+              <span aria-hidden="true">◷</span>Plan time
+            </button>
+            <button class="nav-button" data-view="library">
+              <span aria-hidden="true">▤</span>Readings
+            </button>
+            <button class="nav-button" data-view="resources">
+              <span aria-hidden="true">⌕</span>Find books
+            </button>
+          </div>
+          <details class="rail-more" id="rail-more" open>
+            <summary><span aria-hidden="true">···</span>More</summary>
+            <div class="rail-secondary">
+              <button class="nav-button" data-view="builder">
+                <span aria-hidden="true">◇</span>Your tools
+              </button>
+              <button class="nav-button" data-view="memory">
+                <span aria-hidden="true">◫</span>Conversations
+              </button>
+              <button class="nav-button" data-view="connections">
+                <span aria-hidden="true">✧</span>AI connections
+              </button>
+              <button
+                class="nav-button"
+                id="customize-toggle"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+              >
+                <span aria-hidden="true">◐</span>Appearance
+              </button>
+              <button class="nav-button" data-view="settings">
+                <span aria-hidden="true">⚙</span>Settings
+              </button>
+            </div>
+          </details>
         </nav>
-        <div class="header-end">
-          <span id="connection-status" class="connection-label">Local session</span>
-        </div>
-      </header>
+      </aside>
 
       <div class="workspace">
         <main id="main" tabindex="-1">
-          <section id="library-view" class="view library-view" aria-labelledby="library-heading">
+          <section
+            id="library-view"
+            class="view library-view"
+            aria-labelledby="library-heading"
+            hidden
+          >
             <div class="page-heading">
               <div>
-                <h1 id="library-heading">Library<span class="heading-dot">.</span></h1>
+                <h1 id="library-heading">Readings<span class="heading-dot">.</span></h1>
                 <p class="page-description">
-                  Read, listen, and ask about your own course materials.
+                  Open a PDF, slide deck, or notes to read, listen, highlight, or ask Roger about
+                  it.
                 </p>
               </div>
               <button id="upload-button" class="button button-primary">
@@ -73,7 +96,7 @@
               Cancel opening file
             </button>
             <div class="library-toolbar">
-              <h2>Readings</h2>
+              <h2>Open files</h2>
               <label class="search-field"
                 ><svg viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="10.5" cy="10.5" r="6.5" />
@@ -89,7 +112,7 @@
             <div id="library-list" class="reading-list"></div>
             <div id="library-empty" class="library-empty">
               <span class="empty-glyph" aria-hidden="true">↳</span>
-              <h2>What are you reading?</h2>
+              <h2>Open a reading</h2>
               <p>Choose a file to read, listen, or ask a question.</p>
               <button id="upload-inline" class="button button-primary">
                 Choose a file <span aria-hidden="true">↗</span></button
@@ -98,57 +121,26 @@
             <div class="library-footnote">
               <span aria-hidden="true">↳</span>
               <p>
-                This preview keeps readings and notes for this session only. Download notes before
-                reloading. Course readings live in
-                <button class="inline-link" data-view="courses">Courses</button>.
+                Download your notes before closing or reloading Roger. To open a Canvas reading,
+                choose its class from
+                <button class="inline-link" data-view="courses">Today</button>.
               </p>
             </div>
           </section>
 
-          <section
-            id="courses-view"
-            class="view courses-view"
-            aria-labelledby="courses-heading"
-            hidden
-          >
+          <section id="courses-view" class="view courses-view" aria-labelledby="courses-heading">
             <div class="page-heading campus-hero">
               <div>
-                <p class="eyebrow">LET'S FIGURE IT OUT</p>
-                <h1 id="courses-heading">Courses<span class="heading-dot">.</span></h1>
-                <p class="page-description">Your classes, readings, and what's next.</p>
+                <p class="today-date" id="today-date"></p>
+                <h1 id="courses-heading">Today<span class="heading-dot">.</span></h1>
               </div>
             </div>
-            <section class="connection-panel" aria-labelledby="canvas-heading">
-              <div class="connection-copy">
-                <span class="service-mark" aria-hidden="true">C</span>
-                <div>
-                  <h2 id="canvas-heading">Connect Canvas</h2>
-                  <p>Owner-only local testing</p>
-                </div>
-              </div>
-              <form id="canvas-connect">
-                <label for="canvas-token">Your Canvas access token</label>
-                <div class="input-action">
-                  <input
-                    id="canvas-token"
-                    name="token"
-                    type="password"
-                    autocomplete="off"
-                    placeholder="Paste your own access token"
-                    required
-                  /><button class="button button-primary" type="submit">Connect</button>
-                </div>
-                <p class="field-hint">
-                  Classmates need institution-approved OAuth; do not enter someone else’s token.
-                  Reads course content; live submission is disabled in this preview.
-                </p>
-              </form>
-              <div class="connection-actions">
-                <p id="canvas-status" class="muted" role="status">Not connected</p>
-                <button id="canvas-disconnect" class="button button-quiet" hidden>
-                  Disconnect
-                </button>
-              </div>
+            <section id="canvas-setup" class="today-setup" hidden>
+              <h2>Bring in your assignments</h2>
+              <p>Connect Canvas to see what’s due and open your classes.</p>
+              <button class="button button-primary" type="button" data-view="settings">
+                Connect Canvas
+              </button>
             </section>
             <section id="semester-home" hidden aria-label="Canvas semester">
               <div class="semester-toolbar">
@@ -181,34 +173,102 @@
                 </div>
               </div>
               <p id="semester-coverage" class="muted" role="status" hidden></p>
-              <div id="course-list" class="course-list"></div>
-              <section class="semester-agenda" aria-labelledby="semester-agenda-heading">
-                <h2 id="semester-agenda-heading">Coming up</h2>
-                <div id="semester-filters" class="semester-toolbar" hidden>
-                  <label class="semester-field"
-                    >Course
-                    <select id="semester-course"></select
-                  ></label>
-                  <label class="semester-field"
-                    >Status
-                    <select id="semester-status">
-                      <option value="all">Any status</option>
-                      <option value="upcoming">Upcoming</option>
-                      <option value="unsubmitted">Not submitted</option>
-                      <option value="missing">Missing</option>
-                      <option value="redo">Resubmission requested</option>
-                      <option value="submitted">Submitted</option>
-                      <option value="locked">Locked</option>
-                      <option value="excused">Excused</option>
-                      <option value="unknown">Status unavailable</option>
-                    </select>
-                  </label>
-                </div>
-                <p id="semester-assignment-status" class="muted" role="status"></p>
-                <div id="semester-rows" class="canvas-assignment-list" hidden></div>
-              </section>
+              <div class="today-grid">
+                <section class="semester-agenda" aria-labelledby="semester-agenda-heading">
+                  <h2 id="semester-agenda-heading">Coming up</h2>
+                  <div id="semester-filters" class="semester-toolbar" hidden>
+                    <label class="semester-field"
+                      >Course
+                      <select id="semester-course"></select
+                    ></label>
+                    <label class="semester-field"
+                      >Status
+                      <select id="semester-status">
+                        <option value="all">Any status</option>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="unsubmitted">Not submitted</option>
+                        <option value="missing">Missing</option>
+                        <option value="redo">Resubmission requested</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="locked">Locked</option>
+                        <option value="excused">Excused</option>
+                        <option value="unknown">Status unavailable</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p id="semester-assignment-status" class="muted" role="status"></p>
+                  <div id="semester-rows" class="canvas-assignment-list" hidden></div>
+                </section>
+                <aside class="today-classes" aria-label="Your classes">
+                  <div class="today-section-heading"><h2>Your classes</h2></div>
+                  <div id="course-list" class="course-list"></div>
+                  <div class="today-plan-card">
+                    <h3>Find time to work</h3>
+                    <p>Use your calendar to find an opening before a deadline.</p>
+                    <button type="button" class="button button-secondary" data-view="planner">
+                      Plan time
+                    </button>
+                  </div>
+                </aside>
+              </div>
             </section>
             <div id="course-detail" class="course-detail"></div>
+          </section>
+
+          <section id="planner-view" class="view" aria-labelledby="planner-heading" hidden>
+            <div class="page-heading">
+              <div>
+                <h1 id="planner-heading">Plan time<span class="heading-dot">.</span></h1>
+                <p class="page-description">
+                  Find room for homework around your classes and other commitments.
+                </p>
+              </div>
+            </div>
+            <div id="homework-planner"></div>
+          </section>
+
+          <section id="settings-view" class="view" aria-labelledby="settings-heading" hidden>
+            <div class="page-heading">
+              <h1 id="settings-heading">Settings<span class="heading-dot">.</span></h1>
+            </div>
+            <section class="connection-panel" aria-labelledby="canvas-heading">
+              <div class="connection-copy">
+                <span class="service-mark" aria-hidden="true">C</span>
+                <div>
+                  <h2 id="canvas-heading">Canvas</h2>
+                  <p>Import classes and assignments.</p>
+                </div>
+              </div>
+              <form id="canvas-connect">
+                <label for="canvas-token">Your Canvas access token</label>
+                <div class="input-action">
+                  <input
+                    id="canvas-token"
+                    name="token"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="Paste your own access token"
+                    required
+                  /><button class="button button-primary" type="submit">Connect</button>
+                </div>
+                <p class="field-hint">Use an access token from your own Canvas account.</p>
+              </form>
+              <div class="connection-actions">
+                <p id="canvas-status" class="muted" role="status">Not connected</p>
+                <button id="canvas-disconnect" class="button button-quiet" hidden>
+                  Disconnect
+                </button>
+              </div>
+            </section>
+
+            <div class="settings-ai">
+              <h2>AI provider</h2>
+              <p>Choose the account or provider Roger uses for questions and app changes.</p>
+              <button type="button" class="button button-secondary" data-view="connections">
+                Manage AI
+              </button>
+            </div>
+            <p id="connection-status" class="sr-only" role="status">Local workspace</p>
           </section>
 
           <section
@@ -219,7 +279,7 @@
           >
             <div class="reader-heading">
               <button id="back-library" class="back-link">
-                <span aria-hidden="true">←</span> Library
+                <span aria-hidden="true">←</span> Readings
               </button>
               <div class="document-heading">
                 <h1 id="document-title">Reading</h1>

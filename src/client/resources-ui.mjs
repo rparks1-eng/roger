@@ -11,6 +11,42 @@ function link(label, url) {
   node.rel = 'noopener noreferrer';
   return node;
 }
+// Publisher-provided site icons or verified copies of those marks, served locally.
+const newsLogos = {
+  'AP News': 'news-ap.png',
+  NPR: 'news-npr.png',
+  'The New York Times': 'news-nytimes.png',
+  Reuters: 'news-reuters.png',
+  'The Wall Street Journal': 'news-wsj.png',
+  'Financial Times': 'news-ft.png',
+  'The Economist': 'news-economist.png',
+  Bloomberg: 'news-bloomberg.png',
+  'Yahoo Finance': 'news-yahoo-finance.png',
+  PitchBook: 'news-pitchbook.png',
+  'SEC EDGAR': 'news-sec.png',
+  FRED: 'news-fred.png',
+};
+
+function newsTitle(title, url) {
+  const heading = el('h4');
+  const titleLink = link(title, url);
+  titleLink.className = 'news-title';
+  const filename = newsLogos[title];
+  if (filename) {
+    const logo = el('img', undefined, 'news-logo');
+    logo.alt = '';
+    logo.width = 42;
+    logo.height = 42;
+    logo.loading = 'lazy';
+    logo.decoding = 'async';
+    logo.addEventListener('error', () => logo.remove(), { once: true });
+    logo.src = `/assets/${filename}`;
+    titleLink.prepend(logo);
+  }
+  heading.append(titleLink);
+  return heading;
+}
+
 const newsGroups = [
   [
     'General news',
@@ -71,9 +107,7 @@ function newsDirectory() {
     const grid = el('div', undefined, 'research-grid');
     for (const [title, url, description, access, accessUrl] of entries) {
       const card = el('article', undefined, 'resource-card');
-      const heading = el('h4');
-      heading.append(link(title, url));
-      card.append(heading, el('p', description, 'field-hint'));
+      card.append(newsTitle(title, url), el('p', description, 'field-hint'));
       if (access) card.append(link(access, accessUrl));
       grid.append(card);
     }

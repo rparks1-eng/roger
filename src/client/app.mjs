@@ -23,6 +23,7 @@ import { renderChatText } from '/client/chat-format.mjs';
 import { createMemoryUI } from '/client/memory-ui.mjs';
 import { resolveNavigation } from '/client/roger-navigation.mjs';
 import { createResourcesUI } from '/client/resources-ui.mjs';
+import { createHomeworkPlanner } from '/client/homework-planner.mjs';
 const $ = (id) => document.getElementById(id);
 const state = {
   documents: [],
@@ -67,7 +68,38 @@ function resetQuestionContext() {
   $('roger-widget-sources')?.replaceChildren();
   if (pending) status('Question cancelled because the source context changed.');
 }
-const canvasPanel = createCanvasPanel({ state, api, importFile, status });
+const compactNav = window.matchMedia('(max-width: 760px)');
+const canvasPanel = createCanvasPanel({
+  state,
+  api,
+  importFile,
+  status,
+  onConnectionChange: (connected) => {
+    $('canvas-setup').hidden = connected;
+  },
+  onConnect: () => {
+    if (!$('settings-view').hidden) view('courses');
+  },
+  onAssignmentsChange: () => {
+    if (!$('planner-view').hidden) homeworkPlanner.render();
+    else homeworkPlanner.refresh();
+  },
+});
+const homeworkPlanner = createHomeworkPlanner({
+  container: $('homework-planner'),
+  getAssignments: () => {
+    const { courses, assignments } = canvasPanel.getNavigationIndex();
+    const titles = new Map(courses.map(({ id, name }) => [String(id), name]));
+    return assignments.map((item) => ({
+      ...item,
+      course: { name: titles.get(String(item.courseId)) || 'Canvas course' },
+    }));
+  },
+  onOpenAssignment: (courseId, assignmentId) => {
+    view('courses', { load: false });
+    void canvasPanel.navigate({ courseId, assignmentId }).catch((error) => status(error.message));
+  },
+});
 const customizations = createCustomization({
   getVoicePreset: () => getSpeechPreferences().presetId,
   onNavigate: () => view('customize'),
@@ -169,12 +201,13 @@ function stop() {
   $('pause-button').textContent = 'Pause';
 }
 let navigationTouched = false;
-function view(name, { automatic = false } = {}) {
+function view(name, { automatic = false, load = true, overview = false } = {}) {
   if (name === 'customize') {
     customizationDrawer.open();
     return;
   }
   if (!automatic) navigationTouched = true;
+  if (compactNav.matches) $('rail-more').open = false;
   stop();
   resetQuestionContext();
   if (name !== 'builder') builderUI.leave();
@@ -186,6 +219,8 @@ function view(name, { automatic = false } = {}) {
   for (const candidate of [
     'library',
     'courses',
+    'planner',
+    'settings',
     'reader',
     'builder',
     'app-changes',
@@ -199,7 +234,14 @@ function view(name, { automatic = false } = {}) {
     if (button.dataset.view === name) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  if (name === 'courses' && state.connected) void canvasPanel.loadCourses({ reuse: true });
+  if (name === 'courses') {
+    updateTodayDate();
+    if (load && state.connected) {
+      if (overview) canvasPanel.showToday();
+      else void canvasPanel.loadCourses({ reuse: true });
+    }
+  }
+  if (name === 'planner') homeworkPlanner.render();
   if (name === 'resources') resourcesUI.render();
   if (name === 'memory') return memoryUI.render();
   if (name === 'builder') void builderUI.render();
@@ -658,10 +700,27 @@ async function ask(event, context = {}) {
     }
   }
 }
+function updateTodayDate() {
+  $('today-date').textContent = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
 async function start() {
+  updateTodayDate();
+  const syncRail = () => {
+    $('rail-more').open = !compactNav.matches;
+  };
+  compactNav.addEventListener('change', syncRail);
+  syncRail();
   document
     .querySelectorAll('[data-view]')
-    .forEach((button) => button.addEventListener('click', () => view(button.dataset.view)));
+    .forEach((button) =>
+      button.addEventListener('click', () =>
+        view(button.dataset.view, { overview: button.dataset.view === 'courses' }),
+      ),
+    );
   for (const id of ['upload-button', 'upload-inline'])
     $(id).addEventListener('click', () => $('upload-input').click());
   $('upload-input').addEventListener('change', () => {
@@ -673,6 +732,8 @@ async function start() {
   const rogerResponse = $('roger-widget-response');
   const companion = mountRogerWidget({
     root: rogerWidget,
+    getBottomInset: () =>
+      compactNav.matches ? document.querySelector('.app-rail').getBoundingClientRect().height : 0,
     onOpen: ({ alreadyOpen }) => {
       const source = $('roger-source');
       const previous = source.value;
@@ -1300,7 +1361,7 @@ async function start() {
   const session = await initialize();
   canvasPanel.restore(session.canvas);
   if (session.canvas && !navigationTouched) {
-    view('courses', { automatic: true });
+    view('courses', { automatic: true, load: false });
     await canvasPanel.loadCourses({ reuse: true });
   }
   try {
@@ -1335,6 +1396,7 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 window.addEventListener('beforeunload', () => {
+  homeworkPlanner.destroy();
   stop();
   closePDF();
   ocrController?.abort();

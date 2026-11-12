@@ -5,6 +5,8 @@ import {
   createCanvasReadCache,
   calendarDays,
   agendaGroup,
+  deadlinePresentation,
+  nextUnfinishedAssignment,
 } from '../src/client/canvas-display.mjs';
 
 const now = new Date(2026, 10, 11, 12).getTime();
@@ -110,4 +112,73 @@ test('calendar covers complete Monday-start weeks including leap years and year 
   assert.equal(agendaGroup(new Date(2026, 10, 11, 18), now), 'Today');
   assert.equal(agendaGroup(new Date(2026, 10, 13), now), 'This week');
   assert.equal(agendaGroup(new Date(2026, 10, 16), now), 'Later');
+});
+
+test('deadline wording distinguishes minutes, today, tomorrow and the exact local timestamp', () => {
+  const reference = new Date(2026, 10, 12, 10, 20).getTime();
+  const soon = new Date(2026, 10, 12, 10, 30).toISOString();
+  const result = deadlinePresentation(soon, reference);
+  assert.equal(result.relative, 'Due in 10 min');
+  assert.match(result.named, /^Due today at /);
+  assert.match(result.exact, /2026/);
+  assert.equal(result.overdue, false);
+  assert.match(
+    deadlinePresentation(new Date(2026, 10, 13, 10, 30).toISOString(), reference).named,
+    /^Due tomorrow at /,
+  );
+  assert.equal(
+    deadlinePresentation(new Date(reference + 45_000).toISOString(), reference).relative,
+    'Due in 45 sec',
+  );
+  assert.equal(
+    deadlinePresentation(new Date(reference - 600_000).toISOString(), reference).relative,
+    'Overdue by 10 min',
+  );
+  assert.equal(
+    deadlinePresentation(new Date(reference).toISOString(), reference).relative,
+    'Due now',
+  );
+  assert.equal(deadlinePresentation('invalid', reference).relative, 'No due date');
+  assert.equal(deadlinePresentation(null, reference).exact, '');
+});
+
+test('named deadline groups follow local calendar days across midnight and DST weekends', () => {
+  for (const reference of [new Date(2026, 2, 7, 23, 50), new Date(2026, 10, 12, 23, 50)]) {
+    const due = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() + 1);
+    assert.equal(agendaGroup(due, reference.getTime()), 'Tomorrow');
+    assert.equal(
+      deadlinePresentation(due.toISOString(), reference.getTime()).relative,
+      'Due in 10 min',
+    );
+  }
+  assert.equal(agendaGroup(new Date(2026, 10, 10), now), 'Past due');
+});
+
+test('next deadline excludes completed, locked and unknown work and preserves overdue review', () => {
+  const assignment = (id, status, minutes) => ({
+    id,
+    name: `Assignment ${id}`,
+    status,
+    dueAt: new Date(now + minutes * 60_000).toISOString(),
+  });
+  const upcoming = assignment('next', 'unsubmitted', 10);
+  const oldMissing = assignment('old', 'missing', -1440);
+  const recentOverdue = assignment('recent', 'redo', -5);
+  const items = [
+    oldMissing,
+    recentOverdue,
+    assignment('done', 'submitted', 1),
+    assignment('excused', 'excused', 2),
+    assignment('locked', 'locked', 3),
+    assignment('unknown', 'unknown', 4),
+    assignment('later', 'unsubmitted', 120),
+    upcoming,
+  ];
+  assert.equal(nextUnfinishedAssignment(items, now).id, 'next');
+  assert.equal(nextUnfinishedAssignment([oldMissing, recentOverdue], now).id, 'recent');
+  assert.equal(nextUnfinishedAssignment([assignment('done', 'submitted', 1)], now), null);
+  assert.equal(
+    nextUnfinishedAssignment([{ id: 'undated', name: 'Undated', status: 'unsubmitted' }], now),
+    null,
+  );
 });

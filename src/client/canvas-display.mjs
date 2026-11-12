@@ -11,14 +11,86 @@ const LABELS = Object.freeze({
 export function agendaGroup(dueAt, now = Date.now()) {
   const due = new Date(dueAt),
     today = new Date(now);
+  if (!Number.isFinite(due.getTime())) return 'No due date';
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const afterTomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2);
   const nextWeek = new Date(
     today.getFullYear(),
     today.getMonth(),
     today.getDate() + (7 - ((today.getDay() + 6) % 7)),
   );
+  if (due < start) return 'Past due';
   if (due < tomorrow) return 'Today';
+  if (due < afterTomorrow) return 'Tomorrow';
   return due < nextWeek ? 'This week' : 'Later';
+}
+
+/** Local calendar wording and a live duration; the source timestamp remains unchanged. */
+export function deadlinePresentation(dueAt, now = Date.now()) {
+  const due = new Date(dueAt);
+  if (!dueAt || !Number.isFinite(due.getTime()))
+    return { relative: 'No due date', named: 'No due date', exact: '', overdue: false };
+  const delta = due.getTime() - now;
+  const absolute = Math.abs(delta);
+  let duration;
+  if (absolute < 60_000) duration = `${Math.max(1, Math.ceil(absolute / 1000))} sec`;
+  else {
+    const minutes = Math.ceil(absolute / 60_000);
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const remaining = minutes % 60;
+    duration = [
+      days ? `${days} ${days === 1 ? 'day' : 'days'}` : '',
+      hours ? `${hours} hr` : '',
+      remaining ? `${remaining} min` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+  const group = agendaGroup(dueAt, now);
+  const clock = due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const day =
+    group === 'Today'
+      ? 'today'
+      : group === 'Tomorrow'
+        ? 'tomorrow'
+        : due.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return {
+    relative:
+      absolute < 1000 ? 'Due now' : delta < 0 ? `Overdue by ${duration}` : `Due in ${duration}`,
+    named: `${delta < 0 ? 'Was due' : 'Due'} ${day} at ${clock}`,
+    exact: due.toLocaleString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      ...(due.getSeconds() ? { second: '2-digit' } : {}),
+      timeZoneName: 'short',
+    }),
+    overdue: delta < 0,
+  };
+}
+
+/** Surface the next known unfinished deadline; keep old missing work in its own review list. */
+export function nextUnfinishedAssignment(items, now = Date.now()) {
+  const unfinished = items.filter(
+    (item) =>
+      ['unsubmitted', 'redo', 'missing'].includes(assignmentPresentation(item, now).status) &&
+      Number.isFinite(Date.parse(item.dueAt)),
+  );
+  const upcoming = unfinished
+    .filter((item) => Date.parse(item.dueAt) >= now)
+    .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt) || a.name.localeCompare(b.name));
+  return (
+    upcoming[0] ||
+    unfinished.sort(
+      (a, b) => Date.parse(b.dueAt) - Date.parse(a.dueAt) || a.name.localeCompare(b.name),
+    )[0] ||
+    null
+  );
 }
 
 export function calendarDays(month) {

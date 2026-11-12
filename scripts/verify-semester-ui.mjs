@@ -189,6 +189,41 @@ try {
   assert.equal(counts.courses, 1);
   assert.equal(counts.assignments, 1);
   assert.equal(await page.locator('.agenda-date-group').first().textContent(), 'Today');
+  assert.equal(await page.locator('#canvas-disconnect').isVisible(), false);
+  assert.equal(await page.locator('.app-header').count(), 0);
+  assert.match(await page.locator('.semester-deadline-title').textContent(), /Upcoming reading/);
+  assert.match(await page.locator('.semester-deadline-relative').textContent(), /Due in/);
+  assert.match(await page.locator('.semester-deadline-when').textContent(), /Due today at/);
+  await page.locator('.rail-main [data-view=planner]').click();
+  await page
+    .locator('#homework-planner')
+    .getByRole('heading', { name: 'Your availability' })
+    .waitFor();
+  const icsTime = (time) => new Date(time).toISOString().replace(/[-:]|\.\d{3}/g, '');
+  const start = Date.now() + 3_600_000;
+  const calendar = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'BEGIN:VEVENT',
+    'UID:study-fixture',
+    `DTSTART:${icsTime(start)}`,
+    `DTEND:${icsTime(start + 3_600_000)}`,
+    'SUMMARY:Sample class',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  await page.locator('#homework-planner input[type=file]').setInputFiles({
+    name: 'schedule.ics',
+    mimeType: 'text/calendar',
+    buffer: Buffer.from(calendar),
+  });
+  await page
+    .locator('#homework-planner')
+    .getByText(/1 busy block through/)
+    .waitFor();
+  await page.locator('#homework-planner').getByRole('button', { name: 'Remove calendar' }).click();
+  await page.locator('.rail-main [data-view=courses]').click();
+
   await page.locator('.semester-missing-link').click();
   assert.equal(
     await page.locator('#semester-rows .canvas-assignment-row[data-tone="danger"]').count(),
@@ -205,7 +240,10 @@ try {
   assert.equal(await page.locator('.calendar-day[data-today="true"]').count(), 1);
   assert.equal(await page.locator('.calendar-assignment[data-tone="danger"]').count(), 4);
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
-  await page.getByRole('button', { name: 'Today', exact: true }).click();
+  await page
+    .locator('.assignment-calendar-toolbar')
+    .getByRole('button', { name: 'Today', exact: true })
+    .click();
   await page.locator('.calendar-assignment').filter({ hasText: 'Missing essay 1' }).click();
   await page
     .locator('.canvas-assignment-detail h2')
@@ -259,6 +297,7 @@ try {
   await page.locator('.canvas-course-header h2').filter({ hasText: 'AI Development' }).waitFor();
   assert.equal(counts.course, 2, 'Explicit refresh also invalidates detail cache');
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#rail-more summary').click();
   await page.locator('#customize-toggle').click();
   assert.equal(
     await page.evaluate(

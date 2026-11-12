@@ -8,9 +8,19 @@ import {
   createCanvasReadCache,
   agendaGroup,
   calendarDays,
+  deadlinePresentation,
+  nextUnfinishedAssignment,
 } from '/client/canvas-display.mjs';
 /** Canvas connection and course presentation only; no reader or AI state ownership. */
-export function createCanvasPanel({ state, api, importFile, status }) {
+export function createCanvasPanel({
+  state,
+  api,
+  importFile,
+  status,
+  onAssignmentsChange = () => {},
+  onConnectionChange = () => {},
+  onConnect = () => {},
+}) {
   const $ = (id) => document.getElementById(id);
   const node = (tag, text, className) => {
     const element = document.createElement(tag);
@@ -64,6 +74,11 @@ export function createCanvasPanel({ state, api, importFile, status }) {
   let semesterLoadedAt = 0;
   let assignmentsLoadedAt = 0;
   let coursesLoading = null;
+  let deadlineTimer = null;
+  let deadlineNodes = null;
+  let deadlineItem = null;
+  let agendaDeadlineNodes = [];
+  let agendaGroupNodes = [];
   const readCache = createCanvasReadCache();
   const cachedRead = (url, signal, { ttl = 60_000, force = false } = {}) =>
     readCache.read(url, () => api(url, { signal }), { ttl, force, signal });
@@ -150,8 +165,15 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       ? `Connected read-only · ${profile?.name || 'Canvas account'}`
       : 'Not connected';
     $('connection-status').textContent = state.connected ? 'Canvas · read only' : 'Local workspace';
+    onConnectionChange(state.connected);
   }
   function clearCourses() {
+    clearTimeout(deadlineTimer);
+    deadlineTimer = null;
+    deadlineNodes = null;
+    deadlineItem = null;
+    agendaDeadlineNodes = [];
+    agendaGroupNodes = [];
     activeCourse = null;
     activeAssignment = null;
     activeAssignmentSource = null;
@@ -165,6 +187,7 @@ export function createCanvasPanel({ state, api, importFile, status }) {
     $('course-list').hidden = false;
     $('course-list').replaceChildren();
     $('course-detail').replaceChildren();
+    onAssignmentsChange();
   }
   function restore(value) {
     invalidate();
@@ -209,6 +232,8 @@ export function createCanvasPanel({ state, api, importFile, status }) {
     const rows = $('semester-rows');
     const message = $('semester-assignment-status');
     rows.replaceChildren();
+    agendaDeadlineNodes = [];
+    agendaGroupNodes = [];
     rows.hidden = true;
     message.textContent =
       assignmentIssue ||
@@ -258,7 +283,11 @@ export function createCanvasPanel({ state, api, importFile, status }) {
     for (const item of fullAgenda ? matching : matching.slice(0, 5)) {
       if (!fullAgenda) {
         const group = agendaGroup(item.dueAt, now);
-        if (group !== lastGroup) rows.append(node('h3', group, 'agenda-date-group'));
+        if (group !== lastGroup) {
+          const heading = node('h3', group, 'agenda-date-group');
+          rows.append(heading);
+          agendaGroupNodes.push({ heading, dueAt: item.dueAt });
+        }
         lastGroup = group;
       }
       const row = action(
@@ -268,14 +297,17 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       );
       const copy = node('span', undefined, 'canvas-assignment-copy');
       copy.append(node('strong', item.name), node('span', courseTitle(item.course.name), 'muted'));
-      const dueText = dateText(item.dueAt);
-      const date = node(item.dueAt ? 'time' : 'span', dueText, 'canvas-assignment-due');
+      const deadline = deadlinePresentation(item.dueAt, now);
+      const date = node(item.dueAt ? 'time' : 'span', deadline.named, 'canvas-assignment-due');
+      date.title = deadline.exact;
       if (item.dueAt) date.dateTime = item.dueAt;
       const appearance = assignmentPresentation(item, now);
       row.dataset.status = appearance.status;
       row.dataset.tone = appearance.tone;
       date.dataset.urgency = appearance.soon || appearance.overdue ? appearance.tone : 'neutral';
-      row.append(copy, date, statusBadge(item, now));
+      const badge = statusBadge(item, now);
+      row.append(copy, date, badge);
+      agendaDeadlineNodes.push({ item, row, date, badge });
       rows.append(row);
     }
   }
@@ -381,6 +413,61 @@ export function createCanvasPanel({ state, api, importFile, status }) {
         ),
       );
   }
+  function setText(target, value) {
+    if (target.textContent !== value) target.textContent = value;
+  }
+  function refreshDeadlines() {
+    const now = Date.now();
+    if (deadlineNodes) {
+      deadlineItem = nextUnfinishedAssignment(assignments || [], now);
+      const { hero, badge } = deadlineNodes;
+      hero.hidden = !deadlineItem;
+      if (deadlineItem) {
+        const deadline = deadlinePresentation(deadlineItem.dueAt, now);
+        const appearance = assignmentPresentation(deadlineItem, now);
+        setText(deadlineNodes.heading, deadline.overdue ? 'Needs attention' : 'Next deadline');
+        setText(deadlineNodes.title, deadlineItem.name);
+        setText(deadlineNodes.course, courseTitle(deadlineItem.course.name));
+        setText(deadlineNodes.relative, deadline.relative);
+        setText(deadlineNodes.when, deadline.named);
+        setText(deadlineNodes.exact, deadline.exact);
+        deadlineNodes.exact.dateTime = deadlineItem.dueAt;
+        setText(badge, appearance.label);
+        badge.dataset.tone = appearance.tone;
+        hero.dataset.tone = appearance.tone;
+        hero.setAttribute(
+          'aria-label',
+          `${deadlineItem.name}. ${deadline.relative}. ${deadline.named}. ${appearance.label}. Open assignment.`,
+        );
+      }
+    }
+    for (const { heading, dueAt } of agendaGroupNodes) setText(heading, agendaGroup(dueAt, now));
+    for (const { item, row, date, badge } of agendaDeadlineNodes) {
+      const deadline = deadlinePresentation(item.dueAt, now);
+      const appearance = assignmentPresentation(item, now);
+      setText(date, deadline.named);
+      date.title = deadline.exact;
+      row.dataset.status = appearance.status;
+      row.dataset.tone = appearance.tone;
+      date.dataset.urgency = appearance.soon || appearance.overdue ? appearance.tone : 'neutral';
+      setText(badge, appearance.label);
+      badge.dataset.tone = appearance.tone;
+    }
+  }
+  function scheduleDeadlineUpdate() {
+    clearTimeout(deadlineTimer);
+    if (!state.connected || !semester) return;
+    const visible = !document.hidden && !$('courses-view').hidden && !$('semester-home').hidden;
+    const near = deadlineItem && Math.abs(Date.parse(deadlineItem.dueAt) - Date.now()) < 120_000;
+    deadlineTimer = setTimeout(
+      () => {
+        if (!document.hidden && !$('courses-view').hidden && !$('semester-home').hidden)
+          refreshDeadlines();
+        scheduleDeadlineUpdate();
+      },
+      visible && near ? 1000 : 15_000,
+    );
+  }
   function renderSemester() {
     const courses = selectedCourses();
     $('semester-home').hidden = false;
@@ -420,26 +507,53 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       $('semester-agenda-heading').after(attention);
     }
     attention.replaceChildren();
+    deadlineNodes = null;
     if (assignments && !fullAgenda) {
-      const missing = assignments.filter((item) => item.status === 'missing').length;
-      if (missing) {
-        const shortcut = action(
-          `${missing} marked missing · Review`,
-          () => {
-            fullAgenda = true;
-            $('semester-status').value = 'missing';
-            $('semester-course').value = 'all';
-            renderSemester();
-          },
-          'semester-missing-link',
+      const hero = action(
+        '',
+        () => {
+          if (deadlineItem) void openAssignment(deadlineItem.course.id, deadlineItem.id);
+        },
+        'semester-deadline',
+      );
+      const fields = Object.fromEntries(
+        ['heading', 'title', 'course', 'relative', 'when', 'exact'].map((name) => [
+          name,
+          node(
+            name === 'title' ? 'strong' : name === 'exact' ? 'time' : 'span',
+            '',
+            `semester-deadline-${name}`,
+          ),
+        ]),
+      );
+      const badge = node('span', '', 'canvas-badge');
+      hero.append(
+        ...Object.values(fields),
+        badge,
+        node('span', 'Open assignment →', 'semester-deadline-open'),
+      );
+      deadlineNodes = { hero, badge, ...fields };
+      attention.append(hero);
+      const missing = assignments.filter(
+        (item) => assignmentPresentation(item).status === 'missing',
+      ).length;
+      if (missing)
+        attention.append(
+          action(
+            `${missing} marked missing · Review`,
+            () => {
+              fullAgenda = true;
+              $('semester-status').value = 'missing';
+              $('semester-course').value = 'all';
+              renderSemester();
+            },
+            'semester-missing-link',
+          ),
         );
-        attention.append(shortcut);
-      }
-      const soon = assignments.filter((item) => assignmentPresentation(item).soon).length;
-      if (soon)
-        attention.append(node('span', `${soon} due within 48 hours`, 'semester-soon-count'));
+      refreshDeadlines();
     }
-    attention.hidden = !attention.childElementCount;
+    attention.hidden =
+      !attention.childElementCount || (!deadlineItem && attention.childElementCount === 1);
     $('semester-term').disabled = loadingAgenda;
     $('semester-refresh').disabled = loadingAgenda;
     const list = $('course-list');
@@ -463,6 +577,8 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       if (!courses.length) list.append(node('p', 'Canvas returned no courses for this term.'));
     }
     renderAgenda();
+    scheduleDeadlineUpdate();
+    onAssignmentsChange();
   }
   async function loadSemesterAssignments({ preserve = false, force = false } = {}) {
     const request = operation();
@@ -508,7 +624,7 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       }
     }
   }
-  function returnToSemester() {
+  function returnToSemester({ focus = true } = {}) {
     invalidate();
     activeCourse = null;
     activeAssignment = null;
@@ -516,7 +632,20 @@ export function createCanvasPanel({ state, api, importFile, status }) {
     if (assignments === null || Date.now() - assignmentsLoadedAt >= 60_000)
       void loadSemesterAssignments({ preserve: assignments !== null });
     else renderSemester();
-    $(fullAgenda ? 'semester-assignments' : 'semester-overview').focus();
+    if (focus) $(fullAgenda ? 'semester-assignments' : 'semester-overview').focus();
+  }
+  function showToday() {
+    fullAgenda = false;
+    if (
+      activeCourse ||
+      activeAssignment ||
+      (semester && $('semester-home').hidden && !coursesLoading)
+    ) {
+      returnToSemester({ focus: false });
+      return;
+    }
+    if (semester) renderSemester();
+    void loadCourses({ reuse: true });
   }
   function loadCourses({ reuse = false } = {}) {
     if (!state.connected) return Promise.resolve();
@@ -1199,6 +1328,7 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       state.connected = true;
       labels();
       await loadCourses();
+      if (state.connected) onConnect();
     } catch (error) {
       if (request.valid()) status(error.message || 'Canvas could not connect.');
     } finally {
@@ -1253,7 +1383,14 @@ export function createCanvasPanel({ state, api, importFile, status }) {
       fullAgenda = true;
       renderSemester();
     });
-    window.addEventListener('beforeunload', invalidate, { once: true });
+    window.addEventListener(
+      'beforeunload',
+      () => {
+        clearTimeout(deadlineTimer);
+        invalidate();
+      },
+      { once: true },
+    );
   }
   function getContext() {
     return {
@@ -1285,6 +1422,8 @@ export function createCanvasPanel({ state, api, importFile, status }) {
         courseId: item.course.id,
         dueAt: item.dueAt,
         status: item.status,
+        locked: item.locked,
+        submitted: item.submitted,
       })),
     };
   }
@@ -1336,5 +1475,14 @@ export function createCanvasPanel({ state, api, importFile, status }) {
     }
     return getContext();
   }
-  return { bind, loadCourses, restore, getContext, getNavigationIndex, getSourceContext, navigate };
+  return {
+    bind,
+    loadCourses,
+    showToday,
+    restore,
+    getContext,
+    getNavigationIndex,
+    getSourceContext,
+    navigate,
+  };
 }
