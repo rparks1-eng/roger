@@ -1,4 +1,5 @@
 import { HttpError } from './security.mjs';
+import { pythonDomain } from './python-domain.mjs';
 
 const CACHE_MS = 5 * 60_000;
 const MAX_BYTES = 512 * 1024;
@@ -124,7 +125,23 @@ function googleResults(data, isbn) {
 }
 export function resourceCatalogLinks(query) {
   const encoded = encodeURIComponent(query);
+  const archive = `https://annasarchive.io/search?q=${encoded}`;
   return [
+    {
+      name: 'Anna’s Archive',
+      url: archive,
+      detail: 'Search the external index, including LibGen collections',
+    },
+    {
+      name: 'Open Library',
+      url: `https://openlibrary.org/search?q=${encoded}`,
+      detail: 'Find editions and check borrowing options',
+    },
+    {
+      name: 'Standard Ebooks',
+      url: `https://standardebooks.org/ebooks?query=${encoded}`,
+      detail: 'Find free, carefully formatted classics',
+    },
     {
       name: 'Open Textbook Library',
       url: `https://open.umn.edu/opentextbooks/textbooks?q=${encoded}`,
@@ -145,13 +162,13 @@ export function resourceCatalogLinks(query) {
 export function createResourceSearch({ fetcher = fetch, clock = Date.now } = {}) {
   const cache = new Map();
   let active = 0;
-  async function metadata(url, signal) {
+  async function metadata(url, signal, atom = false) {
     const response = await fetcher(url, {
       redirect: 'error',
       cache: 'no-store',
       signal,
       headers: {
-        accept: 'application/json',
+        accept: atom ? 'application/atom+xml' : 'application/json',
         'user-agent': 'RogerReader/0.1 (local course resource lookup)',
       },
     });
@@ -179,7 +196,8 @@ export function createResourceSearch({ fetcher = fetch, clock = Date.now } = {})
         }
         chunks.push(next.value);
       }
-      return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const body = Buffer.concat(chunks).toString('utf8');
+      return atom ? body : JSON.parse(body);
     } finally {
       signal.removeEventListener('abort', abort);
       reader.releaseLock();
@@ -218,23 +236,48 @@ export function createResourceSearch({ fetcher = fetch, clock = Date.now } = {})
           printType: 'books',
           filter: 'free-ebooks',
         });
-        const attempts = await Promise.allSettled([
-          metadata(openUrl.href, operation),
-          metadata(googleUrl.href, operation),
-        ]);
-        if (signal?.aborted) throw new HttpError(408, 'Resource search cancelled.');
-        const results = [],
-          sources = [];
-        for (let index = 0; index < attempts.length; index++) {
-          const attempt = attempts[index];
-          const name = ['Open Textbook Library', 'Google Books'][index];
-          sources.push({
-            name,
-            state: attempt.status === 'fulfilled' ? 'searched' : 'unavailable',
+        const providers = [
+          {
+            name: 'Open Textbook Library',
+            lookup: async () => textbookResults(await metadata(openUrl.href, operation), isbn),
+          },
+          {
+            name: 'Google Books',
+            lookup: async () => googleResults(await metadata(googleUrl.href, operation), isbn),
+          },
+        ];
+        if (!isbn) {
+          const gutenbergUrl = new URL('https://www.gutenberg.org/ebooks/search.opds/');
+          gutenbergUrl.searchParams.set('query', query);
+          providers.unshift({
+            name: 'Project Gutenberg',
+            lookup: async () => {
+              const xml = await metadata(gutenbergUrl.href, operation, true);
+              const records = await pythonDomain('books.opds', { xml }, { signal: operation });
+              return records.map(({ id, title, author }) => {
+                const sourceUrl = `https://www.gutenberg.org/ebooks/${id}`;
+                return {
+                  id: `gutenberg:${id}`,
+                  title,
+                  authors: author ? [author] : [],
+                  source: 'Project Gutenberg',
+                  sourceUrl,
+                  access: 'Free ebook',
+                  downloads: [{ format: 'ebook', url: sourceUrl, direct: false }],
+                };
+              });
+            },
           });
-          if (attempt.status === 'fulfilled')
-            results.push(...[textbookResults, googleResults][index](attempt.value, isbn));
         }
+        const attempts = await Promise.allSettled(providers.map(({ lookup }) => lookup()));
+        if (signal?.aborted) throw new HttpError(408, 'Resource search cancelled.');
+        const results = attempts.flatMap((attempt) =>
+          attempt.status === 'fulfilled' ? attempt.value : [],
+        );
+        const sources = attempts.map((attempt, index) => ({
+          name: providers[index].name,
+          state: attempt.status === 'fulfilled' ? 'searched' : 'unavailable',
+        }));
         const result = {
           query,
           isbn,

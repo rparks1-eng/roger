@@ -45,7 +45,7 @@ layer serves these only into sandboxed iframes with a separate restrictive CSP;
 no generated code runs in Node or the parent app. Session expiry and server close
 dispose connection services. See Engineering Checks.md for current evidence.
 
-`memory.mjs` owns private local conversation persistence, explicit preferences, exact course/assignment retrieval, paginated inspection, pause/export/deletion and capacity failure. Runtime injects disk storage; fixture servers default to in-memory storage. `appearance-builder.mjs` validates a declarative appearance; `web-resources.mjs` uses fixed Open Textbook Library and Google Books endpoints to return free full-text options; `course-export.mjs` creates explicitly partial course snapshots. No generated code receives these capabilities directly.
+`memory.mjs` owns private local conversation persistence, explicit preferences, exact course/assignment retrieval, paginated inspection, pause/export/deletion and capacity failure. Runtime injects disk storage; fixture servers default to in-memory storage. `appearance-builder.mjs` validates a declarative appearance; `web-resources.mjs` uses fixed Project Gutenberg, Open Textbook Library, and Google Books endpoints to return free full-text options. Gutenberg Atom is parsed by the bounded Python worker. Archive and research links open in the user’s browser; `course-export.mjs` creates explicitly partial course snapshots. No generated code receives these capabilities directly.
 
 `app-changes.mjs` builds exact source edits through the selected connection, formats
 and checks candidate browser code without executing it, and captures fixed public

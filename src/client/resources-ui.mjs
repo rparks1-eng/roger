@@ -11,6 +11,76 @@ function link(label, url) {
   node.rel = 'noopener noreferrer';
   return node;
 }
+const newsGroups = [
+  [
+    'General news',
+    [
+      ['AP News', 'https://apnews.com/', 'Breaking news and reporting'],
+      ['NPR', 'https://www.npr.org/', 'Public radio, articles, and podcasts'],
+      ['The New York Times', 'https://www.nytimes.com/', 'News, analysis, and culture'],
+      ['Reuters', 'https://www.reuters.com/', 'World news and business reporting'],
+    ],
+  ],
+  [
+    'Business and markets',
+    [
+      [
+        'The Wall Street Journal',
+        'https://www.wsj.com/',
+        'Business and markets',
+        'Babson access',
+        'https://libguides.babson.edu/economics/Start',
+      ],
+      [
+        'Financial Times',
+        'https://www.ft.com/',
+        'Global business and economics',
+        'Babson access',
+        'https://libguides.babson.edu/economics/Start',
+      ],
+      ['The Economist', 'https://www.economist.com/', 'Economics and global affairs'],
+      [
+        'Bloomberg',
+        'https://www.bloomberg.com/',
+        'Markets and companies',
+        'Campus terminals',
+        'https://libguides.babson.edu/c.php?g=26345&p=161029',
+      ],
+      ['Yahoo Finance', 'https://finance.yahoo.com/', 'Quotes, company news, and market data'],
+      [
+        'PitchBook',
+        'https://pitchbook.com/',
+        'Private companies, deals, and venture capital',
+        'Babson access',
+        'https://libguides.babson.edu/supplychain/company',
+      ],
+      ['SEC EDGAR', 'https://www.sec.gov/edgar/search/', 'Public company filings'],
+      ['FRED', 'https://fred.stlouisfed.org/', 'Economic data and charts'],
+    ],
+  ],
+];
+function newsDirectory() {
+  const directory = el('section', undefined, 'research-directory');
+  directory.id = 'resource-news';
+  directory.append(
+    el('h2', 'News & research'),
+    el('p', 'Open a publisher or database. For campus subscriptions, start with Horn Library.'),
+    link('Horn Library access and databases', 'https://libguides.babson.edu/HornLibrary'),
+  );
+  for (const [category, entries] of newsGroups) {
+    const grid = el('div', undefined, 'research-grid');
+    for (const [title, url, description, access, accessUrl] of entries) {
+      const card = el('article', undefined, 'resource-card');
+      const heading = el('h4');
+      heading.append(link(title, url));
+      card.append(heading, el('p', description, 'field-hint'));
+      if (access) card.append(link(access, accessUrl));
+      grid.append(card);
+    }
+    directory.append(el('h3', category), grid);
+  }
+  return directory;
+}
 export function createResourcesUI({ container, api }) {
   let controller,
     generation = 0;
@@ -22,8 +92,8 @@ export function createResourcesUI({ container, api }) {
   input.type = 'search';
   input.required = true;
   input.maxLength = 240;
-  input.placeholder = 'Pride and Prejudice, Jane Austen, or an ISBN…';
-  const search = el('button', 'Find free copies', 'button button-primary');
+  input.placeholder = 'Pride and Prejudice, finance, or an ISBN…';
+  const search = el('button', 'Search books', 'button button-primary');
   search.type = 'submit';
   const cancel = el('button', 'Cancel search', 'button button-quiet');
   cancel.type = 'button';
@@ -33,13 +103,36 @@ export function createResourcesUI({ container, api }) {
   status.setAttribute('role', 'status');
   const results = el('div', undefined, 'resource-results');
   const catalogs = el('div', undefined, 'resource-catalogs');
+  const bookPanel = el('section');
+  bookPanel.id = 'resource-books';
+  const booksButton = el('button', 'Books', 'button button-secondary');
+  const newsButton = el('button', 'News & research', 'button button-secondary');
+  const directory = newsDirectory();
+  const nav = el('nav', undefined, 'resource-section-nav');
+  nav.setAttribute('aria-label', 'Resource sections');
+  nav.append(booksButton, newsButton);
+  for (const [button, panel] of [
+    [booksButton, bookPanel],
+    [newsButton, directory],
+  ]) {
+    button.type = 'button';
+    button.setAttribute('aria-controls', panel.id);
+    button.addEventListener('click', () => selectSection(panel));
+  }
+  function selectSection(panel) {
+    bookPanel.hidden = panel !== bookPanel;
+    directory.hidden = panel !== directory;
+    booksButton.setAttribute('aria-pressed', String(panel === bookPanel));
+    newsButton.setAttribute('aria-pressed', String(panel === directory));
+  }
+  selectSection(bookPanel);
   async function request(query) {
     generation++;
     const ownGeneration = generation;
     controller?.abort();
     controller = new AbortController();
     input.value = query;
-    status.textContent = 'Looking for free full books…';
+    status.textContent = 'Searching for full books…';
     search.disabled = true;
     cancel.hidden = false;
     try {
@@ -88,7 +181,7 @@ export function createResourcesUI({ container, api }) {
         card.append(actions);
         results.append(card);
       }
-      catalogs.append(el('h2', 'More free book collections'));
+      catalogs.append(el('h2', 'Search more collections'));
       for (const catalog of data.catalogs) {
         const row = el('p');
         row.append(
@@ -120,22 +213,14 @@ export function createResourcesUI({ container, api }) {
     status.textContent = 'Search cancelled. Previous results are still available.';
   });
   function render() {
-    container.replaceChildren(
-      el('h1', 'Find free textbooks'),
-      el(
-        'p',
-        'Search by ISBN for your assigned edition, or by title, author, or subject for free textbooks and readings.',
-      ),
+    bookPanel.replaceChildren(
+      el('p', 'Find novels, plays, nonfiction, and textbooks by title, author, subject, or ISBN.'),
       form,
       status,
       results,
       catalogs,
-      el(
-        'p',
-        'Downloads open at the source. For a class reading, check the edition before using it.',
-        'field-hint',
-      ),
     );
+    container.replaceChildren(el('h1', 'Find books'), nav, bookPanel, directory);
   }
   function dispose() {
     generation++;

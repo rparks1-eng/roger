@@ -8,7 +8,7 @@
       "sha256": "0f8a3fb971ae4fc8695e1ff20487799e89dd927d90e652e21ea5b1ef22149ca9",
       "dependencyLockSha256": "ba0cc463d8cf741c9bfc6a9f5182fb6633fa95cf1819b23a15947a387c731075"
     },
-    "fingerprint": "28f6921d4f75797ec84ae6845ca5fd2c336c8022bd4b594ca94c92308de1f54b",
+    "fingerprint": "49ae501d6d6d02cb4d54fdcbb3b815823dff8991c49a71eb74b5959b979cf1b3",
     "modules": [
       {
         "file": "src/client/api.mjs",
@@ -607,7 +607,7 @@
       },
       {
         "file": "src/client/resources-ui.mjs",
-        "sha256": "d4f032fb8ed21434aa8a80c743614452541f5745c8c2edeaca33bba916ddbe40",
+        "sha256": "0df1be2d80e0b572635923df2b3dc26533cb7ab2f9abb6e257580392a6e9f00d",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -1787,14 +1787,15 @@
       },
       {
         "file": "src/server/python-domain.mjs",
-        "sha256": "da4ee60f7a98e2920d7dda118f079942afd3363c1666a348d4feb4eb7a7cf9c2",
+        "sha256": "985432f20fde8c9442963c980a299d762446efb63b96ac3dd64aff18a0678893",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
           "src/server/canvas.mjs",
           "src/server/http.mjs",
           "src/server/retrieval.mjs",
-          "src/server/study.mjs"
+          "src/server/study.mjs",
+          "src/server/web-resources.mjs"
         ],
         "dependencies": [],
         "otherImports": [
@@ -2025,15 +2026,30 @@
       },
       {
         "file": "src/server/web-resources.mjs",
-        "sha256": "af65798d93a25cd58fd6e102b00da4dfd18b3f3d16a16e2d075d54702c39464e",
+        "sha256": "9300af966e223e4cc6e3b73dc07bb198d410123db4ef911aee546635559b0c8b",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [
+          "src/server/python-domain.mjs",
           "src/server/security.mjs"
         ],
         "importedBy": [
           "src/server/http.mjs"
         ],
         "dependencies": [
+          {
+            "to": "src/server/python-domain.mjs",
+            "specifier": "./python-domain.mjs",
+            "kind": "source import; not runtime data flow",
+            "locations": [
+              {
+                "specifier": "./python-domain.mjs",
+                "line": 2,
+                "column": 1,
+                "syntax": "ImportDeclaration"
+              }
+            ],
+            "locationStatus": "located"
+          },
           {
             "to": "src/server/security.mjs",
             "specifier": "./security.mjs",
@@ -2055,7 +2071,7 @@
     ]
   },
   "coverage": "JavaScript/TypeScript and Python static imports plus verified worker declarations; no runtime data lineage or provider reachability claim.",
-  "fingerprint": "7dc80bc9b5e418ecb6e5d001d56cb54cd1421874459c7db246077dfab4e7274f",
+  "fingerprint": "c72265df4aa572564adf15518ab272136bbc0a9689bef4c8455df6d072946490",
   "sources": [
     {
       "path": "src/client/api.mjs",
@@ -2123,7 +2139,7 @@
     },
     {
       "path": "src/client/resources-ui.mjs",
-      "sha256": "d4f032fb8ed21434aa8a80c743614452541f5745c8c2edeaca33bba916ddbe40"
+      "sha256": "0df1be2d80e0b572635923df2b3dc26533cb7ab2f9abb6e257580392a6e9f00d"
     },
     {
       "path": "src/client/roger-navigation.mjs",
@@ -2195,7 +2211,7 @@
     },
     {
       "path": "src/python/worker.py",
-      "sha256": "2001ee582a2990fafe90be50c9e330ab11a13c0c71468169f57f4c297fc1c97e"
+      "sha256": "d50c71bf06d0d1df186b9e9cc70c426764f99203cf76a7c641e623c04b261137"
     },
     {
       "path": "src/server/app-changes.mjs",
@@ -2259,7 +2275,7 @@
     },
     {
       "path": "src/server/python-domain.mjs",
-      "sha256": "da4ee60f7a98e2920d7dda118f079942afd3363c1666a348d4feb4eb7a7cf9c2"
+      "sha256": "985432f20fde8c9442963c980a299d762446efb63b96ac3dd64aff18a0678893"
     },
     {
       "path": "src/server/python-presentation.mjs",
@@ -2283,7 +2299,7 @@
     },
     {
       "path": "src/server/web-resources.mjs",
-      "sha256": "af65798d93a25cd58fd6e102b00da4dfd18b3f3d16a16e2d075d54702c39464e"
+      "sha256": "9300af966e223e4cc6e3b73dc07bb198d410123db4ef911aee546635559b0c8b"
     }
   ],
   "nodes": [
@@ -2833,43 +2849,43 @@
       "from": "src/python/worker.py",
       "to": "src/python/canvas_records.py",
       "kind": "python-import",
-      "line": 13
+      "line": 15
     },
     {
       "from": "src/python/worker.py",
       "to": "src/python/common.py",
       "kind": "python-import",
-      "line": 9
+      "line": 11
     },
     {
       "from": "src/python/worker.py",
       "to": "src/python/exam_plan.py",
       "kind": "python-import",
-      "line": 15
+      "line": 17
     },
     {
       "from": "src/python/worker.py",
       "to": "src/python/retrieval.py",
       "kind": "python-import",
-      "line": 10
+      "line": 12
     },
     {
       "from": "src/python/worker.py",
       "to": "src/python/study_sets.py",
       "kind": "python-import",
-      "line": 12
+      "line": 14
     },
     {
       "from": "src/python/worker.py",
       "to": "src/python/study.py",
       "kind": "python-import",
-      "line": 11
+      "line": 13
     },
     {
       "from": "src/python/worker.py",
       "to": "src/python/syllabus.py",
       "kind": "python-import",
-      "line": 14
+      "line": 16
     },
     {
       "from": "src/server/app-changes.mjs",
@@ -3381,6 +3397,20 @@
         {
           "specifier": "./security.mjs",
           "line": 3,
+          "column": 1,
+          "syntax": "ImportDeclaration"
+        }
+      ],
+      "locationStatus": "located"
+    },
+    {
+      "from": "src/server/web-resources.mjs",
+      "to": "src/server/python-domain.mjs",
+      "kind": "js-import",
+      "locations": [
+        {
+          "specifier": "./python-domain.mjs",
+          "line": 2,
           "column": 1,
           "syntax": "ImportDeclaration"
         }

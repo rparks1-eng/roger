@@ -5,6 +5,7 @@ import path from 'node:path';
 const worker = fileURLToPath(new URL('../python/worker.py', import.meta.url));
 const python = process.env.READER_PYTHON ?? '/usr/bin/python3';
 const limits = Object.freeze({
+  'books.opds': 3 * 1024 * 1024,
   retrieval: 2 * 1024 * 1024,
   'study.prepare': 128 * 1024,
   'study.validate': 256 * 1024,

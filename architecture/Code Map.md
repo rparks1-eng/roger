@@ -148,6 +148,7 @@ flowchart LR
   n54 -->|js-import| n24
   n54 -->|js-import| n50
   n55 -->|js-import| n53
+  n56 -->|js-import| n50
   n56 -->|js-import| n53
 ```
 
@@ -254,13 +255,13 @@ flowchart LR
 | [src/python/study_sets.py](../src/python/study_sets.py) | src/python/study.py | 6 |
 | [src/python/study.py](../src/python/study.py) | src/python/common.py | 4 |
 | [src/python/syllabus.py](../src/python/syllabus.py) | src/python/common.py | 11 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/canvas_records.py | 13 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/common.py | 9 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/exam_plan.py | 15 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/retrieval.py | 10 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/study_sets.py | 12 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/study.py | 11 |
-| [src/python/worker.py](../src/python/worker.py) | src/python/syllabus.py | 14 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/canvas_records.py | 15 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/common.py | 11 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/exam_plan.py | 17 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/retrieval.py | 12 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/study_sets.py | 14 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/study.py | 13 |
+| [src/python/worker.py](../src/python/worker.py) | src/python/syllabus.py | 16 |
 | [src/server/app-changes.mjs](../src/server/app-changes.mjs) | src/server/app-preview.mjs | 8 |
 | [src/server/app-changes.mjs](../src/server/app-changes.mjs) | src/server/security.mjs | 7 |
 | [src/server/appearance-builder.mjs](../src/server/appearance-builder.mjs) | src/server/security.mjs | 1 |
@@ -299,6 +300,7 @@ flowchart LR
 | [src/server/study.mjs](../src/server/study.mjs) | src/core/cli-runner.ts | 2 |
 | [src/server/study.mjs](../src/server/study.mjs) | src/server/python-domain.mjs | 1 |
 | [src/server/submissions.mjs](../src/server/submissions.mjs) | src/server/security.mjs | 3 |
+| [src/server/web-resources.mjs](../src/server/web-resources.mjs) | src/server/python-domain.mjs | 2 |
 | [src/server/web-resources.mjs](../src/server/web-resources.mjs) | src/server/security.mjs | 1 |
 
 The JSON includes exact source hashes, dependency-lock and producer identity, reverse importers, external import syntax and explicit dynamic/unsupported unknowns.

@@ -1,6 +1,8 @@
 """Fixed JSON domain entry point. Operations are allowlisted, never code or paths."""
 
 import json
+import re
+from xml.etree import ElementTree
 from pathlib import Path
 import sys
 
@@ -15,6 +17,7 @@ import syllabus
 import exam_plan
 
 LIMITS = {
+    "books.opds": 3 * 1024 * 1024,
     "retrieval": 2 * 1024 * 1024,
     "study.prepare": 128 * 1024,
     "study.validate": 256 * 1024,
@@ -40,8 +43,34 @@ LIMITS = {
 }
 
 
+def gutenberg_catalog(value):
+    xml = value.get("xml")
+    require(isinstance(xml, str) and "<!" not in xml)
+    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    feed = ElementTree.fromstring(xml)
+    require(feed.tag == "{http://www.w3.org/2005/Atom}feed")
+    results = []
+    for entry in feed.findall("atom:entry", ns)[:12]:
+        identifier = entry.findtext("atom:id", "", ns)
+        match = re.fullmatch(
+            r"https?://www\.gutenberg\.org/ebooks/(\d{1,8})(?:\.opds)?", identifier
+        )
+        title = entry.findtext("atom:title", "", ns).strip()[:300]
+        if match and title:
+            results.append(
+                {
+                    "id": match[1],
+                    "title": title,
+                    "author": entry.findtext("atom:content", "", ns).strip()[:200],
+                }
+            )
+    return results
+
+
 def dispatch(operation, value):
     require(operation in LIMITS)
+    if operation == "books.opds":
+        return gutenberg_catalog(value)
     if operation == "retrieval":
         return retrieval.search(value)
     if operation == "study.prepare":
