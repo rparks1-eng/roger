@@ -7,6 +7,7 @@ const FONTS = {
 const VARIABLES = [
   'canvas',
   'surface',
+  'paper',
   'ink',
   'text',
   'muted',
@@ -145,6 +146,7 @@ export function createAppearancePreview({
     const variables = {
       canvas,
       surface,
+      paper: surface,
       ink,
       text: ink,
       muted: blend(ink, surface, 0.2),
@@ -229,7 +231,219 @@ export function createAppearancePreview({
   document.body.append(previewNotice);
   controls.append(build, cancel, undo, reset);
   form.append(label, input, controls);
+  // Manual colors share the same saved appearance and undo history as Roger previews.
+  let colorTarget = 'accent',
+    hue = 0,
+    saturation = 1,
+    brightness = 1,
+    editingColor = false;
+  const picker = el('section', undefined, 'color-picker');
+  const targets = el('div', undefined, 'color-targets');
+  targets.setAttribute('role', 'group');
+  targets.setAttribute('aria-label', 'Color to edit');
+  const targetButtons = new Map();
+  for (const [key, name] of Object.entries({
+    accent: 'Accent',
+    canvas: 'Background',
+    surface: 'Cards',
+    ink: 'Text',
+  })) {
+    const button = el('button', name);
+    button.type = 'button';
+    button.addEventListener('click', () => {
+      colorTarget = key;
+      editingColor = false;
+      syncPicker();
+    });
+    targets.append(button);
+    targetButtons.set(key, button);
+  }
+  const wheel = el('div', undefined, 'color-wheel');
+  wheel.setAttribute('role', 'group');
+  wheel.setAttribute('aria-label', 'Color wheel');
+  const shade = el('div', undefined, 'color-wheel-shade');
+  const marker = el('span', undefined, 'color-wheel-marker');
+  shade.setAttribute('aria-hidden', 'true');
+  marker.setAttribute('aria-hidden', 'true');
+  wheel.append(shade, marker);
+  const fields = el('div', undefined, 'color-fields');
+  const sliders = [];
+  for (const [name, max] of [
+    ['Hue', 359],
+    ['Saturation', 100],
+    ['Brightness', 100],
+  ]) {
+    const label = el('label', name);
+    const slider = el('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = String(max);
+    slider.setAttribute('aria-label', name);
+    slider.addEventListener('input', () => {
+      const value = Number(slider.value);
+      if (name === 'Hue') hue = value;
+      else if (name === 'Saturation') saturation = value / 100;
+      else brightness = value / 100;
+      setColor(fromHSV());
+    });
+    slider.addEventListener('change', () => {
+      editingColor = false;
+    });
+    label.append(slider);
+    fields.append(label);
+    sliders.push(slider);
+  }
+  const hexLabel = el('label', 'Hex color');
+  const hex = el('input');
+  hex.type = 'text';
+  hex.maxLength = 7;
+  hex.spellcheck = false;
+  hex.setAttribute('aria-label', 'Hex color');
+  hex.setAttribute('aria-describedby', 'color-help');
+  hex.addEventListener('input', () => {
+    const value = hex.value.startsWith('#') ? hex.value : `#${hex.value}`;
+    const valid = /^#[\da-f]{6}$/i.test(value);
+    hex.setAttribute('aria-invalid', String(!valid));
+    if (valid) setColor(value.toLowerCase());
+  });
+  hex.addEventListener('change', () => {
+    editingColor = false;
+  });
+  hexLabel.append(hex);
+  fields.append(hexLabel);
+  const pickerBody = el('div', undefined, 'color-picker-body');
+  pickerBody.append(wheel, fields);
+  const help = el(
+    'p',
+    'Drag to any shade. Fine-tune with the sliders or enter a hex color. Changes save automatically on this device.',
+    'field-hint',
+  );
+  help.id = 'color-help';
+  picker.append(targets, pickerBody, help);
+  function currentAppearance() {
+    if (draft || applied) return structuredClone(draft || applied);
+    const computed = getComputedStyle(root);
+    const defaults = { canvas: '#f3f0e7', surface: '#ffffff', ink: '#21392e', accent: '#254c3c' };
+    const palette = Object.fromEntries(
+      Object.entries(defaults).map(([key, fallback]) => {
+        const value = computed.getPropertyValue(`--${key}`).trim();
+        return [key, /^#[\da-f]{6}$/i.test(value) ? value : fallback];
+      }),
+    );
+    return {
+      version: 1,
+      title: 'Custom colors',
+      palette,
+      font: 'rounded',
+      radius: 18,
+      motion: 'none',
+      motifs: [],
+    };
+  }
+  function fromHSV() {
+    const c = brightness * saturation,
+      x = c * (1 - Math.abs(((hue / 60) % 2) - 1)),
+      m = brightness - c;
+    const channels = [
+      [c, x, 0],
+      [x, c, 0],
+      [0, c, x],
+      [0, x, c],
+      [x, 0, c],
+      [c, 0, x],
+    ][Math.floor(hue / 60) % 6];
+    return (
+      '#' +
+      channels
+        .map((value) =>
+          Math.round((value + m) * 255)
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('')
+    );
+  }
+  function syncPicker() {
+    const palette = currentAppearance().palette;
+    const color = palette[colorTarget];
+    const [r, g, b] = [1, 3, 5].map(
+      (offset) => parseInt(color.slice(offset, offset + 2), 16) / 255,
+    );
+    const max = Math.max(r, g, b),
+      min = Math.min(r, g, b),
+      delta = max - min;
+    if (delta)
+      hue =
+        ((max === r ? (g - b) / delta : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4) *
+          60 +
+          360) %
+        360;
+    saturation = max ? delta / max : saturation;
+    brightness = max;
+    hex.value = color;
+    hex.setAttribute('aria-invalid', 'false');
+    sliders[0].value = String(Math.round(hue));
+    sliders[1].value = String(Math.round(saturation * 100));
+    sliders[2].value = String(Math.round(brightness * 100));
+    shade.style.opacity = String(1 - brightness);
+    marker.style.left = `${50 + Math.cos((hue * Math.PI) / 180) * saturation * 50}%`;
+    marker.style.top = `${50 + Math.sin((hue * Math.PI) / 180) * saturation * 50}%`;
+    marker.style.background = color;
+    for (const [key, button] of targetButtons) {
+      button.setAttribute('aria-pressed', String(key === colorTarget));
+      button.style.setProperty('--swatch', palette[key]);
+    }
+  }
+  function setColor(color) {
+    clearPending();
+    if (!editingColor) {
+      previous = applied;
+      hasPrevious = true;
+      editingColor = true;
+    }
+    const discardedPreview = Boolean(draft);
+    draft = null;
+    if (discardedPreview) paint(applied);
+    const next = currentAppearance();
+    next.title = 'Custom colors';
+    next.palette[colorTarget] = color;
+    applied = next;
+    draft = null;
+    paint(applied);
+    status.textContent = persist(applied, previous)
+      ? `Color saved.${discardedPreview ? ' The unkept AI preview was discarded.' : ''}`
+      : 'Color applied for this session. Browser storage is unavailable.';
+    refresh();
+  }
+  function pointColor(event) {
+    const rect = wheel.getBoundingClientRect();
+    const x = (event.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+    const y = (event.clientY - rect.top - rect.height / 2) / (rect.height / 2);
+    hue = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+    saturation = Math.min(1, Math.hypot(x, y));
+    setColor(fromHSV());
+  }
+  let pointer = null;
+  wheel.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || pointer !== null) return;
+    pointer = event.pointerId;
+    editingColor = false;
+    wheel.setPointerCapture(pointer);
+    pointColor(event);
+  });
+  wheel.addEventListener('pointermove', (event) => {
+    if (event.pointerId === pointer) pointColor(event);
+  });
+  const finishColor = (event) => {
+    if (event.pointerId !== pointer) return;
+    pointer = null;
+    editingColor = false;
+  };
+  wheel.addEventListener('pointerup', finishColor);
+  wheel.addEventListener('pointercancel', finishColor);
+  wheel.addEventListener('lostpointercapture', finishColor);
   function refresh() {
+    syncPicker();
     undo.disabled = !hasPrevious || !!draft || !!controller;
     reset.disabled = !applied && !draft;
     previewNotice.hidden = !draft;
@@ -321,6 +535,7 @@ export function createAppearancePreview({
   undo.addEventListener('click', () => {
     if (!hasPrevious) return;
     clearPending();
+    editingColor = false;
     const old = applied;
     applied = previous;
     previous = old;
@@ -337,6 +552,7 @@ export function createAppearancePreview({
     hasPrevious = true;
     applied = null;
     draft = null;
+    editingColor = false;
     paint(null);
     status.textContent = persist(null, previous)
       ? 'Original Roger design restored.'
@@ -345,20 +561,18 @@ export function createAppearancePreview({
   });
   function render() {
     if (!container) return;
-    container.replaceChildren(
-      el('h2', 'Design your space'),
+    const advanced = el('details', undefined, 'appearance-ai');
+    advanced.append(
+      el('summary', 'Ask Roger for a bigger change'),
       el(
         'p',
-        'Ask Roger to change this app’s colors, typography, rounded controls and moving background. Preview it here before you keep it.',
+        'You can also ask Roger from any page to change the look or build a tool. AI changes open as a preview before you keep them.',
       ),
       form,
-      status,
-      el(
-        'p',
-        'Only your appearance request and current design settings go to your chosen AI. Your readings stay out of this request.',
-        'field-hint',
-      ),
     );
+    const history = el('div', undefined, 'appearance-actions');
+    history.append(undo, reset);
+    container.replaceChildren(picker, history, status, advanced);
     refresh();
   }
   function dispose() {

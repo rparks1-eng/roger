@@ -102,3 +102,158 @@
     will-change: auto;
   }
 }
+
+/* The editor stays legible even while the user changes the app's text colors. */
+#customize-drawer {
+  --surface: #f0eee6;
+  --paper: #f8f6ef;
+  --ink: #26332d;
+  --text: #26332d;
+  --muted: #59665e;
+  --line: #d6d9cf;
+  --accent: #315d47;
+  --accent-hover: #254735;
+  --header-ink: #ffffff;
+  --wash: #e5e9df;
+  width: min(480px, calc(100vw - 24px));
+}
+#customize-drawer::backdrop {
+  background: #132e2a18;
+  backdrop-filter: none;
+}
+#appearance-content {
+  padding: 20px 22px 0;
+}
+.color-targets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 22px;
+}
+.color-targets button {
+  padding: 10px 3px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #26332d;
+  font: 600 12px/1.4 var(--body);
+  cursor: pointer;
+}
+.color-targets button::before {
+  content: '';
+  display: block;
+  width: 23px;
+  height: 23px;
+  margin: 0 auto 6px;
+  border: 1px solid #0003;
+  border-radius: 50%;
+  background: var(--swatch);
+}
+.color-targets button[aria-pressed='true'] {
+  background: #e5e9df;
+  border-color: #a2b39f;
+}
+.color-picker-body {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+}
+.color-wheel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle closest-side, white, transparent),
+    conic-gradient(from 90deg, red, #ff0, #0f0, #0ff, #00f, #f0f, red);
+  box-shadow: 0 4px 20px #21392e18;
+  touch-action: none;
+  cursor: crosshair;
+}
+.color-wheel-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #000;
+  pointer-events: none;
+}
+.color-wheel-marker {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px #26332d,
+    0 2px 6px #0005;
+  pointer-events: none;
+}
+.color-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.color-fields label {
+  display: grid;
+  gap: 4px;
+  color: #59665e;
+  font: 600 11px/1.4 var(--body);
+}
+#customize-drawer .color-fields input[type='range'] {
+  width: 100%;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  accent-color: #315d47;
+}
+#customize-drawer .color-fields input[type='text'] {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #bdc6b9;
+  border-radius: 8px;
+  font:
+    500 13px/1.4 ui-monospace,
+    monospace;
+}
+.color-fields input[aria-invalid='true'] {
+  outline: 2px solid #a93737;
+}
+#color-help {
+  margin: 18px 0 12px;
+  color: #59665e;
+  font-size: 12px;
+}
+#appearance-content .appearance-actions .button {
+  font-size: 11px;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+.appearance-status {
+  font-size: 12px;
+  color: #59665e;
+}
+.appearance-ai {
+  border-block: 1px solid #d6d9cf;
+  padding: 14px 0;
+  margin-top: 16px;
+  font-size: 12px;
+}
+.appearance-ai summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.appearance-ai p {
+  line-height: 1.6;
+}
+@media (max-width: 440px) {
+  .color-picker-body {
+    grid-template-columns: minmax(145px, 1.3fr) minmax(0, 1fr);
+    gap: 18px;
+  }
+  #appearance-content {
+    padding-inline: 16px;
+  }
+}

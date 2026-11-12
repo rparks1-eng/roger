@@ -8,7 +8,7 @@
       "sha256": "0f8a3fb971ae4fc8695e1ff20487799e89dd927d90e652e21ea5b1ef22149ca9",
       "dependencyLockSha256": "ba0cc463d8cf741c9bfc6a9f5182fb6633fa95cf1819b23a15947a387c731075"
     },
-    "fingerprint": "98312e42f13705dc2a77937639a9982c6397409847a02be13efb5417d323e02d",
+    "fingerprint": "9035d8fced6ae686c645038c4669f00ee2c5aec584d39234fc2884edacfb35b6",
     "modules": [
       {
         "file": "src/client/api.mjs",
@@ -262,7 +262,7 @@
       },
       {
         "file": "src/client/appearance-preview.mjs",
-        "sha256": "d87fc58e2ed088523893d9a854c49d4c664eacfc23d4624d14279a0431c4c6e4",
+        "sha256": "013641051d12e9d261be57a0cec6134858dc92f97a370f803ff8b825cdccb40c",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -274,7 +274,7 @@
       },
       {
         "file": "src/client/builder-ui.mjs",
-        "sha256": "8c050736f1010685d76d6a393e675f3621487031f527a86750fe4bf1c1675167",
+        "sha256": "7d7db5a637f22a74abd7f6ed0707e3e7a263dffa924b6dc0e82d5d683d9395b6",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -483,7 +483,7 @@
       },
       {
         "file": "src/client/customization.mjs",
-        "sha256": "1c5a778987f3f3c516f48414aa81cc1dd5d428e187d7c176fdccf47510ea8dde",
+        "sha256": "7cb6718c01c946d7afcc538a8adf2ddb51baa2bb6ac1105b46f7340e890ad986",
         "locationParser": "ESLint built-in parser; no source config or rules loaded",
         "imports": [],
         "importedBy": [
@@ -1864,7 +1864,7 @@
     ]
   },
   "coverage": "JavaScript/TypeScript and Python static imports plus verified worker declarations; no runtime data lineage or provider reachability claim.",
-  "fingerprint": "d5896dfec78b019154fbcbfc94beb7a97ed47a549ba4342084d393d2d918e476",
+  "fingerprint": "6d5874ea9186089ad68913a3adf2aab6c7dc101d851d213dbedcf3e67aa968b1",
   "sources": [
     {
       "path": "src/client/api.mjs",
@@ -1876,11 +1876,11 @@
     },
     {
       "path": "src/client/appearance-preview.mjs",
-      "sha256": "d87fc58e2ed088523893d9a854c49d4c664eacfc23d4624d14279a0431c4c6e4"
+      "sha256": "013641051d12e9d261be57a0cec6134858dc92f97a370f803ff8b825cdccb40c"
     },
     {
       "path": "src/client/builder-ui.mjs",
-      "sha256": "8c050736f1010685d76d6a393e675f3621487031f527a86750fe4bf1c1675167"
+      "sha256": "7d7db5a637f22a74abd7f6ed0707e3e7a263dffa924b6dc0e82d5d683d9395b6"
     },
     {
       "path": "src/client/canvas-display.mjs",
@@ -1908,7 +1908,7 @@
     },
     {
       "path": "src/client/customization.mjs",
-      "sha256": "1c5a778987f3f3c516f48414aa81cc1dd5d428e187d7c176fdccf47510ea8dde"
+      "sha256": "7cb6718c01c946d7afcc538a8adf2ddb51baa2bb6ac1105b46f7340e890ad986"
     },
     {
       "path": "src/client/documents.mjs",

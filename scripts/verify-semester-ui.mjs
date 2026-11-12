@@ -272,6 +272,7 @@ try {
   await page.setViewportSize({ width: 1200, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.locator('#customize-toggle').click();
+  await page.locator('.appearance-ai summary').click();
   await page.locator('#appearance-request').fill('Create a meadow theme');
   await page.getByRole('button', { name: 'Preview my space', exact: true }).click();
   await page.locator('#customize-drawer').waitFor({ state: 'hidden' });
@@ -287,6 +288,7 @@ try {
   await page.getByRole('button', { name: 'Restore previous appearance', exact: true }).click();
   assert.equal(await page.locator('html').getAttribute('data-generated-appearance'), null);
   await page.locator('#customize-toggle').click();
+  await page.locator('.appearance-ai summary').click();
   await page.locator('#appearance-request').fill('Create a meadow theme again');
   await page.getByRole('button', { name: 'Preview my space', exact: true }).click();
   await page.locator('#customize-drawer').waitFor({ state: 'hidden' });
@@ -304,6 +306,7 @@ try {
   await page.locator('#customize-toggle').click();
   await page.getByRole('button', { name: 'Undo last appearance', exact: true }).click();
   assert.equal(await page.locator('html').getAttribute('data-generated-appearance'), null);
+  await page.locator('.appearance-ai summary').click();
   await page.locator('#appearance-request').fill('FAIL_APPEARANCE');
   await page.getByRole('button', { name: 'Preview my space', exact: true }).click();
   await page
@@ -326,6 +329,92 @@ try {
     'Undo must survive reload',
   );
   assert.equal(appearanceCalls, 3);
+  // Continuous colors work without AI, persist exactly, and undo a whole drag.
+  await page.locator('#customize-toggle').click();
+  assert.equal(await page.getByRole('combobox', { name: 'Theme', exact: true }).count(), 0);
+  assert.equal(await page.getByText('Make it yours', { exact: true }).count(), 0);
+  await page.getByRole('textbox', { name: 'Hex color', exact: true }).fill('#724ac8');
+  assert.equal(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--accent')),
+    '#724ac8',
+  );
+  await page.getByRole('textbox', { name: 'Hex color', exact: true }).fill('#zzzzzz');
+  assert.equal(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--accent')),
+    '#724ac8',
+  );
+  await page.locator('#customize-close').click();
+  await page.reload();
+  await page.locator('.canvas-course-card').first().waitFor();
+  assert.equal(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--accent')),
+    '#724ac8',
+  );
+  await page.locator('#customize-toggle').click();
+  const wheel = await page.getByRole('group', { name: 'Color wheel', exact: true }).boundingBox();
+  await page.mouse.move(wheel.x + wheel.width * 0.7, wheel.y + wheel.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(wheel.x + wheel.width / 2, wheel.y + wheel.height * 0.85, { steps: 5 });
+  await page.mouse.up();
+  assert.notEqual(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--accent')),
+    '#724ac8',
+  );
+  await page.getByRole('button', { name: 'Undo last appearance', exact: true }).click();
+  assert.equal(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--accent')),
+    '#724ac8',
+  );
+  await page.getByRole('button', { name: 'Background', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Hex color', exact: true }).fill('#c4d4e8');
+  assert.equal(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--canvas')),
+    '#c4d4e8',
+  );
+  const brightness = page.getByRole('slider', { name: 'Brightness', exact: true });
+  await brightness.focus();
+  await brightness.press('ArrowLeft');
+  assert.notEqual(
+    await page.locator('html').evaluate((el) => el.style.getPropertyValue('--canvas')),
+    '#c4d4e8',
+  );
+  assert.equal(appearanceCalls, 3, 'Manual colors never call the AI provider');
+  await page.getByRole('button', { name: 'Use original Roger design', exact: true }).click();
+  assert.equal(await page.locator('html').getAttribute('data-generated-appearance'), null);
+  await page.locator('#customize-close').click();
+  // Editing colors must not silently accept a generated, unkept design.
+  const originalPalette = await page
+    .locator('html')
+    .evaluate((el) =>
+      ['canvas', 'surface', 'ink'].map((key) =>
+        globalThis.getComputedStyle(el).getPropertyValue(`--${key}`).trim(),
+      ),
+    );
+  await page.locator('#customize-toggle').click();
+  await page.locator('.appearance-ai summary').click();
+  await page.locator('#appearance-request').fill('Create a meadow theme for manual editing');
+  await page.getByRole('button', { name: 'Preview my space', exact: true }).click();
+  await page.locator('#customize-drawer').waitFor({ state: 'hidden' });
+  await page.locator('#customize-toggle').click();
+  await page.getByRole('button', { name: 'Accent', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Hex color', exact: true }).fill('#244568');
+  assert.equal(await page.locator('#roger-atmosphere .environment-motif').count(), 0);
+  assert.deepEqual(
+    await page
+      .locator('html')
+      .evaluate((el) =>
+        ['canvas', 'surface', 'ink'].map((key) => el.style.getPropertyValue(`--${key}`).trim()),
+      ),
+    originalPalette,
+  );
+  assert.equal(await page.locator('.appearance-preview-notice').isVisible(), false);
+  await page
+    .locator('.appearance-status')
+    .filter({ hasText: 'unkept AI preview was discarded' })
+    .waitFor();
+  await page.getByRole('button', { name: 'Use original Roger design', exact: true }).click();
+  await page.locator('#customize-close').click();
+  assert.equal(appearanceCalls, 4);
   const navigation = await page.evaluate(async () => {
     const { createCanvasPanel } = await import('/client/canvas-ui.mjs');
     const course = { id: '42', name: 'Navigation fixture', code: 'TEST42', termId: 'current' };

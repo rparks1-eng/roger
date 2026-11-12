@@ -37,7 +37,7 @@ export function createBuilderUI({ container, api, getSelection, onConnect, onNav
   heading.append(
     el('p', 'MADE FOR THE WAY YOU THINK', 'eyebrow'),
     el('h1', 'Build with Roger'),
-    el('p', 'Describe a tool. Try it. Make it yours.', 'page-description'),
+    el('p', 'Describe a tool. Preview it. Keep what works.', 'page-description'),
   );
   const sidebar = el('aside', undefined, 'feature-library');
   sidebar.setAttribute('aria-label', 'Your tools');

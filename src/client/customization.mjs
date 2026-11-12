@@ -281,15 +281,10 @@ export function createCustomization({
       return item;
     };
     const panel = node('section', undefined, 'customization-panel');
-    panel.append(
-      node('h3', 'Appearance'),
-      node(
-        'p',
-        'Small adjustments apply immediately. Your current course stays open behind this panel.',
-      ),
-    );
+    panel.append(node('h3', 'Reading & display'), node('p', 'Adjust text, spacing and narration.'));
     const controls = node('div', undefined, 'customization-controls');
     for (const [key, choices] of Object.entries(OPTIONS)) {
+      if (key === 'theme') continue;
       const label = node(
         'label',
         key === 'fontSize' ? 'Text size' : key[0].toUpperCase() + key.slice(1),
@@ -419,23 +414,28 @@ export function createCustomization({
       if (onBuild) row.append(button('Build this idea', () => onBuild(request.text)));
       queue.append(row);
     }
-    requests.append(
-      queue,
-      button('Export change brief & pages', () => {
-        const blob = new Blob([exportBrief()], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = node('a');
-        link.href = url;
-        link.download = 'Roger change brief.md';
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }),
-    );
-    panel.append(requests, pages);
+    const exportPages = button('Export saved pages & ideas', () => {
+      const blob = new Blob([exportBrief()], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = node('a');
+      link.href = url;
+      link.download = 'Roger change brief.md';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+    requests.append(queue);
+    if (state.pages.length || state.requests.length) pages.append(exportPages);
+    // Existing notes remain reachable; feature building belongs in the Roger conversation.
+    if (state.pages.length || state.requests.length) panel.append(pages);
+    if (state.requests.length) {
+      const archive = node('details');
+      archive.append(node('summary', 'Earlier saved ideas'), requests);
+      panel.append(archive);
+    }
     const status = node(
       'p',
       storageAvailable
-        ? 'Stored only in this browser on this device. Export your pages to keep a portable copy.'
+        ? 'Saved on this device.'
         : 'Browser storage unavailable. Export your pages before closing.',
       'field-hint',
     );
