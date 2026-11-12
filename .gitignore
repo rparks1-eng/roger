@@ -31,3 +31,6 @@ scripts/reuse-owner-canvas.mjs
 *.mp4
 canvas-owner.json
 feature-library.json
+
+# Private source-change rollback journal; never published.
+.roger-changes/

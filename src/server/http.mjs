@@ -20,14 +20,17 @@ import { pythonDomain } from './python-domain.mjs';
 import { createNarrationService } from './narration.mjs';
 import { createConnectionService, ConnectionError } from './connections.mjs';
 import { createFeatureBuilder } from './builder.mjs';
+import { createAppChangeService } from './app-changes.mjs';
+import { recoveryHTML, recoveryCSS, recoveryJS } from './app-recovery.mjs';
 import { createAppearanceBuilder } from './appearance-builder.mjs';
 import { createResourceSearch } from './web-resources.mjs';
 import { createMemoryStore } from './memory.mjs';
 import { createCourseExport } from './course-export.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const assets = new Map([
+export const readerAssets = new Map([
   ['/', ['public/index.html', 'text/html; charset=utf-8']],
   ['/styles.css', ['public/styles.css', 'text/css']],
+  ['/app-changes.css', ['public/app-changes.css', 'text/css']],
   ['/appearance.css', ['public/appearance.css', 'text/css']],
   ['/memory.css', ['public/memory.css', 'text/css']],
   ['/resources.css', ['public/resources.css', 'text/css']],
@@ -60,6 +63,7 @@ const assets = new Map([
     'canvas-display',
     'customization-drawer',
     'appearance-preview',
+    'app-changes-ui',
     'resources-ui',
     'roger-navigation',
     'memory-ui',
@@ -73,17 +77,24 @@ export function createReaderServer({
   narrationAdapter = createNarrationService(),
   connectionFactory = createConnectionService,
   featureBuilder = createFeatureBuilder(),
+  assetRoot = root,
+  appChangeService,
   memoryStore = createMemoryStore({ dbPath: ':memory:' }),
   clock = Date.now,
   configuredCanvas = null,
   submissionOptions = {},
 } = {}) {
+  const assets = readerAssets;
+  const appChanges = appChangeService || createAppChangeService({ root: assetRoot, assets });
   const appearanceBuilder = createAppearanceBuilder();
   const resourceSearch = createResourceSearch();
   const connections = new WeakMap();
   const sessions = createSessions({
     clock,
-    onDispose: (session) => connections.get(session)?.dispose(),
+    onDispose: (session) => {
+      connections.get(session)?.dispose();
+      void Promise.resolve(appChanges.disposeOwner(session.csrf)).catch(() => {});
+    },
   });
   const narration = narrationAdapter;
   const connectionFor = (session) => {
@@ -104,7 +115,8 @@ export function createReaderServer({
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
-      req.url?.startsWith('/api/features/build') ||
+      req.url?.startsWith('/api/app-changes/build') ||
+        req.url?.startsWith('/api/features/build') ||
         req.url?.startsWith('/api/appearance/build') ||
         req.url?.startsWith('/api/connections/')
         ? 150_000
@@ -130,16 +142,35 @@ export function createReaderServer({
     try {
       assertHost(req);
       const url = new URL(req.url, `http://${req.headers.host}`);
+      // Keep the live app on its canonical host; previews use localhost so cookies differ.
+      if (url.hostname === 'localhost' && ['/', '/app-recovery'].includes(url.pathname)) {
+        res.statusCode = 307;
+        res.setHeader('Location', `http://127.0.0.1:${server.address().port}${url.pathname}`);
+        res.end();
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/favicon.ico') {
         res.statusCode = 204;
         res.end();
+        return;
+      }
+      const recoveryAssets = {
+        '/app-recovery': [recoveryHTML, 'text/html; charset=utf-8'],
+        '/app-recovery.js': [recoveryJS, 'text/javascript'],
+        '/app-recovery.css': [recoveryCSS, 'text/css'],
+      };
+      if (req.method === 'GET' && Object.hasOwn(recoveryAssets, url.pathname)) {
+        if (url.pathname === '/app-recovery') sessions.get(req, res, true);
+        const [content, mime] = recoveryAssets[url.pathname];
+        res.setHeader('Content-Type', mime);
+        res.end(content);
         return;
       }
       if (req.method === 'GET' && assets.has(url.pathname)) {
         const session = url.pathname === '/' ? sessions.get(req, res, true) : null;
         void session;
         const [file, mime] = assets.get(url.pathname);
-        let bytes = await readFile(path.join(root, file));
+        let bytes = await readFile(path.join(assetRoot, file));
         res.setHeader('Content-Type', mime);
         res.end(bytes);
         return;
@@ -168,7 +199,8 @@ export function createReaderServer({
           url.pathname.startsWith('/api/memory/') &&
           url.pathname !== '/api/memory/export'
           ? 'memoryRead'
-          : req.method === 'GET' && url.pathname.startsWith('/api/features')
+          : req.method === 'GET' &&
+              (url.pathname.startsWith('/api/features') || url.pathname === '/api/app-changes')
             ? 'featureRead'
             : /^\/api\/(?:canvas\/(?:study-file|study-assignments|page)|study\/passages|documents\/(?:ocr|presentation))$/.test(
                   url.pathname,
@@ -177,6 +209,7 @@ export function createReaderServer({
               : [
                     '/api/connections/ask',
                     '/api/features/build',
+                    '/api/app-changes/build',
                     '/api/appearance/build',
                     '/api/study',
                     '/api/study/set',
@@ -246,6 +279,34 @@ export function createReaderServer({
         if (!Object.hasOwn(operations, action))
           throw new HttpError(404, 'Memory action not found.');
         json(memoryStore[operations[action]](body));
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/app-changes') {
+        json(await appChanges.get({ owner: session.csrf }));
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/app-changes/build') {
+        json(
+          await appChanges.build(await readJson(req, 16384, controller.signal), {
+            owner: session.csrf,
+            signal: controller.signal,
+            generate: (request) => connectionFor(session).generate(request),
+          }),
+        );
+        return;
+      }
+      if (
+        req.method === 'POST' &&
+        ['/api/app-changes/apply', '/api/app-changes/discard', '/api/app-changes/undo'].includes(
+          url.pathname,
+        )
+      ) {
+        const action = url.pathname.split('/').at(-1);
+        json(
+          await appChanges[action](await readJson(req, 4096, controller.signal), {
+            owner: session.csrf,
+          }),
+        );
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/appearance/build') {
@@ -734,6 +795,7 @@ export function createReaderServer({
   server.on('close', () => {
     sessions.clear();
     memoryStore.close();
+    void Promise.resolve(appChanges.dispose()).catch(() => {});
   });
   return server;
 }

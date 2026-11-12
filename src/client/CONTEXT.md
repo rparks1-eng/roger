@@ -18,3 +18,10 @@ cancels generation and removes the iframe. App controls keep their existing
 validated customization path; generated tools never modify the parent DOM.
 
 `roger-navigation.mjs` resolves verified course/assignment labels without model-invented destinations. `memory-ui.mjs` owns history inspection, resume and explicit preferences. `canvas-display.mjs` owns status/calendar/cache helpers; `customization-drawer.mjs` preserves the current page. `appearance-preview.mjs` applies validated colors and decorative motion with preview/undo; `resources-ui.mjs` renders catalog evidence. Global Ask saves its conversations/receipts; separate reader/study-panel histories are not yet unified.
+
+`app-changes-ui.mjs` owns whole-app source-preview review, revision, explicit Apply,
+discard and Undo. Roger's Change app mode and explicit integrated-feature requests
+route here; separate tool requests keep the builder path. The UI discloses source
+context before generation, renders code as inert text, opens the preview with no
+opener, and requires review confirmation before writing. Recovery is server-owned
+and remains accessible even if an applied browser change breaks this interface.

@@ -7,6 +7,7 @@
     <title>Roger — your study companion</title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/builder.css" />
+    <link rel="stylesheet" href="/app-changes.css" />
     <link rel="stylesheet" href="/connections.css" />
     <link rel="stylesheet" href="/appearance.css" />
     <link rel="stylesheet" href="/resources.css" />
@@ -392,7 +393,16 @@
             <div id="memory-content"></div>
           </section>
           <section id="builder-view" class="view" aria-label="Build with Roger" hidden>
+            <aside class="app-change-entry">
+              <p>Want to change Roger’s own pages or features?</p>
+              <button class="button button-secondary" data-view="app-changes">
+                Change the app
+              </button>
+            </aside>
             <div id="builder-content"></div>
+          </section>
+          <section id="app-changes-view" class="view" aria-label="Change Roger" hidden>
+            <div id="app-changes-content"></div>
           </section>
           <section id="connections-view" class="view" aria-label="AI connections" hidden>
             <div id="connections-content"></div>
@@ -464,7 +474,8 @@
           <label class="sr-only" for="roger-mode">Roger mode</label>
           <select id="roger-mode">
             <option value="ask">Ask</option>
-            <option value="build">Build / change app</option>
+            <option value="change-app">Change app</option>
+            <option value="build">Build tool</option>
           </select>
           <button id="roger-ai" type="button">Connect AI</button>
         </div>

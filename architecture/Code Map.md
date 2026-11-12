@@ -8,142 +8,153 @@ Do not edit by hand. Edges show source dependencies and declared workers, not ru
 ```mermaid
 flowchart LR
   n0["src/client/api.mjs"]
-  n1["src/client/app.mjs"]
-  n2["src/client/appearance-preview.mjs"]
-  n3["src/client/builder-ui.mjs"]
-  n4["src/client/canvas-display.mjs"]
-  n5["src/client/canvas-ui.mjs"]
-  n6["src/client/chat-format.mjs"]
-  n7["src/client/connections-ui.mjs"]
-  n8["src/client/course-study-ui.mjs"]
-  n9["src/client/customization-drawer.mjs"]
-  n10["src/client/customization.mjs"]
-  n11["src/client/documents.mjs"]
-  n12["src/client/loading-ui.mjs"]
-  n13["src/client/memory-ui.mjs"]
-  n14["src/client/pdf-workspace.mjs"]
-  n15["src/client/resources-ui.mjs"]
-  n16["src/client/roger-navigation.mjs"]
-  n17["src/client/roger-widget.mjs"]
-  n18["src/client/speech.mjs"]
-  n19["src/client/study-ui.mjs"]
-  n20["src/client/submission-ui.mjs"]
-  n21["src/client/syllabus-ui.mjs"]
-  n22["src/core/cli-protocol.ts"]
-  n23["src/core/cli-runner.ts"]
-  n24["src/python/canvas_records.py"]
-  n25["src/python/common.py"]
-  n26["src/python/exam_plan.py"]
-  n27["src/python/presentation.py"]
-  n28["src/python/retrieval.py"]
-  n29["src/python/study.py"]
-  n30["src/python/study_sets.py"]
-  n31["src/python/syllabus.py"]
-  n32["src/python/worker.py"]
-  n33["src/server/appearance-builder.mjs"]
-  n34["src/server/builder.mjs"]
-  n35["src/server/canvas-download.mjs"]
-  n36["src/server/canvas.mjs"]
-  n37["src/server/connections.mjs"]
-  n38["src/server/course-export.mjs"]
-  n39["src/server/document-processing.mjs"]
-  n40["src/server/http.mjs"]
-  n41["src/server/index.mjs"]
-  n42["src/server/memory.mjs"]
-  n43["src/server/narration.mjs"]
-  n44["src/server/owner-canvas.mjs"]
-  n45["src/server/python-domain.mjs"]
-  n46["src/server/python-presentation.mjs"]
-  n47["src/server/retrieval.mjs"]
-  n48["src/server/security.mjs"]
-  n49["src/server/study.mjs"]
-  n50["src/server/submissions.mjs"]
-  n51["src/server/web-resources.mjs"]
-  n1 -->|js-import| n0
-  n1 -->|js-import| n2
-  n1 -->|js-import| n3
-  n1 -->|js-import| n5
-  n1 -->|js-import| n6
-  n1 -->|js-import| n7
-  n1 -->|js-import| n9
-  n1 -->|js-import| n10
-  n1 -->|js-import| n11
-  n1 -->|js-import| n13
-  n1 -->|js-import| n14
-  n1 -->|js-import| n15
-  n1 -->|js-import| n16
-  n1 -->|js-import| n17
-  n1 -->|js-import| n18
-  n5 -->|js-import| n4
-  n5 -->|js-import| n8
-  n5 -->|js-import| n12
-  n5 -->|js-import| n19
-  n5 -->|js-import| n20
-  n5 -->|js-import| n21
-  n8 -->|js-import| n19
-  n8 -->|js-import| n21
-  n13 -->|js-import| n6
-  n19 -->|js-import| n11
-  n19 -->|js-import| n12
-  n19 -->|js-import| n21
-  n21 -->|js-import| n0
-  n21 -->|js-import| n11
-  n21 -->|js-import| n12
-  n23 -->|js-import| n22
-  n24 -->|python-import| n25
-  n26 -->|python-import| n25
-  n28 -->|python-import| n25
-  n30 -->|python-import| n25
-  n30 -->|python-import| n29
-  n29 -->|python-import| n25
-  n31 -->|python-import| n25
-  n32 -->|python-import| n24
-  n32 -->|python-import| n25
-  n32 -->|python-import| n26
-  n32 -->|python-import| n28
-  n32 -->|python-import| n30
-  n32 -->|python-import| n29
+  n1["src/client/app-changes-ui.mjs"]
+  n2["src/client/app.mjs"]
+  n3["src/client/appearance-preview.mjs"]
+  n4["src/client/builder-ui.mjs"]
+  n5["src/client/canvas-display.mjs"]
+  n6["src/client/canvas-ui.mjs"]
+  n7["src/client/chat-format.mjs"]
+  n8["src/client/connections-ui.mjs"]
+  n9["src/client/course-study-ui.mjs"]
+  n10["src/client/customization-drawer.mjs"]
+  n11["src/client/customization.mjs"]
+  n12["src/client/documents.mjs"]
+  n13["src/client/loading-ui.mjs"]
+  n14["src/client/memory-ui.mjs"]
+  n15["src/client/pdf-workspace.mjs"]
+  n16["src/client/resources-ui.mjs"]
+  n17["src/client/roger-navigation.mjs"]
+  n18["src/client/roger-widget.mjs"]
+  n19["src/client/speech.mjs"]
+  n20["src/client/study-ui.mjs"]
+  n21["src/client/submission-ui.mjs"]
+  n22["src/client/syllabus-ui.mjs"]
+  n23["src/core/cli-protocol.ts"]
+  n24["src/core/cli-runner.ts"]
+  n25["src/python/app_changes.py"]
+  n26["src/python/canvas_records.py"]
+  n27["src/python/common.py"]
+  n28["src/python/exam_plan.py"]
+  n29["src/python/presentation.py"]
+  n30["src/python/retrieval.py"]
+  n31["src/python/study.py"]
+  n32["src/python/study_sets.py"]
+  n33["src/python/syllabus.py"]
+  n34["src/python/worker.py"]
+  n35["src/server/app-changes.mjs"]
+  n36["src/server/app-preview.mjs"]
+  n37["src/server/app-recovery.mjs"]
+  n38["src/server/appearance-builder.mjs"]
+  n39["src/server/builder.mjs"]
+  n40["src/server/canvas-download.mjs"]
+  n41["src/server/canvas.mjs"]
+  n42["src/server/connections.mjs"]
+  n43["src/server/course-export.mjs"]
+  n44["src/server/document-processing.mjs"]
+  n45["src/server/http.mjs"]
+  n46["src/server/index.mjs"]
+  n47["src/server/memory.mjs"]
+  n48["src/server/narration.mjs"]
+  n49["src/server/owner-canvas.mjs"]
+  n50["src/server/python-domain.mjs"]
+  n51["src/server/python-presentation.mjs"]
+  n52["src/server/retrieval.mjs"]
+  n53["src/server/security.mjs"]
+  n54["src/server/study.mjs"]
+  n55["src/server/submissions.mjs"]
+  n56["src/server/web-resources.mjs"]
+  n2 -->|js-import| n0
+  n2 -->|js-import| n1
+  n2 -->|js-import| n3
+  n2 -->|js-import| n4
+  n2 -->|js-import| n6
+  n2 -->|js-import| n7
+  n2 -->|js-import| n8
+  n2 -->|js-import| n10
+  n2 -->|js-import| n11
+  n2 -->|js-import| n12
+  n2 -->|js-import| n14
+  n2 -->|js-import| n15
+  n2 -->|js-import| n16
+  n2 -->|js-import| n17
+  n2 -->|js-import| n18
+  n2 -->|js-import| n19
+  n6 -->|js-import| n5
+  n6 -->|js-import| n9
+  n6 -->|js-import| n13
+  n6 -->|js-import| n20
+  n6 -->|js-import| n21
+  n6 -->|js-import| n22
+  n9 -->|js-import| n20
+  n9 -->|js-import| n22
+  n14 -->|js-import| n7
+  n20 -->|js-import| n12
+  n20 -->|js-import| n13
+  n20 -->|js-import| n22
+  n22 -->|js-import| n0
+  n22 -->|js-import| n12
+  n22 -->|js-import| n13
+  n24 -->|js-import| n23
+  n26 -->|python-import| n27
+  n28 -->|python-import| n27
+  n30 -->|python-import| n27
+  n32 -->|python-import| n27
   n32 -->|python-import| n31
-  n33 -->|js-import| n48
-  n34 -->|js-import| n48
-  n36 -->|js-import| n35
-  n36 -->|js-import| n45
-  n37 -->|js-import| n22
-  n37 -->|js-import| n23
-  n38 -->|js-import| n48
-  n39 -->|js-import| n46
-  n40 -->|js-import| n33
-  n40 -->|js-import| n34
-  n40 -->|js-import| n36
-  n40 -->|js-import| n37
-  n40 -->|js-import| n38
-  n40 -->|js-import| n39
-  n40 -->|js-import| n42
-  n40 -->|js-import| n43
-  n40 -->|js-import| n45
-  n40 -->|js-import| n47
-  n40 -->|js-import| n48
-  n40 -->|js-import| n49
-  n40 -->|js-import| n50
-  n40 -->|js-import| n51
+  n31 -->|python-import| n27
+  n33 -->|python-import| n27
+  n34 -->|python-import| n26
+  n34 -->|python-import| n27
+  n34 -->|python-import| n28
+  n34 -->|python-import| n30
+  n34 -->|python-import| n32
+  n34 -->|python-import| n31
+  n34 -->|python-import| n33
+  n35 -->|js-import| n36
+  n35 -->|js-import| n53
+  n38 -->|js-import| n53
+  n39 -->|js-import| n53
   n41 -->|js-import| n40
-  n41 -->|js-import| n42
-  n41 -->|js-import| n44
-  n42 -->|js-import| n48
-  n43 -->|js-import| n48
-  n45 -->|declared-worker| n32
-  n46 -->|declared-worker| n27
-  n47 -->|js-import| n45
-  n49 -->|js-import| n22
-  n49 -->|js-import| n23
-  n49 -->|js-import| n45
-  n50 -->|js-import| n48
-  n51 -->|js-import| n48
+  n41 -->|js-import| n50
+  n42 -->|js-import| n23
+  n42 -->|js-import| n24
+  n43 -->|js-import| n53
+  n44 -->|js-import| n51
+  n45 -->|js-import| n35
+  n45 -->|js-import| n37
+  n45 -->|js-import| n38
+  n45 -->|js-import| n39
+  n45 -->|js-import| n41
+  n45 -->|js-import| n42
+  n45 -->|js-import| n43
+  n45 -->|js-import| n44
+  n45 -->|js-import| n47
+  n45 -->|js-import| n48
+  n45 -->|js-import| n50
+  n45 -->|js-import| n52
+  n45 -->|js-import| n53
+  n45 -->|js-import| n54
+  n45 -->|js-import| n55
+  n45 -->|js-import| n56
+  n46 -->|js-import| n45
+  n46 -->|js-import| n47
+  n46 -->|js-import| n49
+  n47 -->|js-import| n53
+  n48 -->|js-import| n53
+  n50 -->|declared-worker| n34
+  n51 -->|declared-worker| n29
+  n52 -->|js-import| n50
+  n54 -->|js-import| n23
+  n54 -->|js-import| n24
+  n54 -->|js-import| n50
+  n55 -->|js-import| n53
+  n56 -->|js-import| n53
 ```
 
 ## Open source
 
 - [src/client/api.mjs](../src/client/api.mjs)
+- [src/client/app-changes-ui.mjs](../src/client/app-changes-ui.mjs)
 - [src/client/app.mjs](../src/client/app.mjs)
 - [src/client/appearance-preview.mjs](../src/client/appearance-preview.mjs)
 - [src/client/builder-ui.mjs](../src/client/builder-ui.mjs)
@@ -167,6 +178,7 @@ flowchart LR
 - [src/client/syllabus-ui.mjs](../src/client/syllabus-ui.mjs)
 - [src/core/cli-protocol.ts](../src/core/cli-protocol.ts)
 - [src/core/cli-runner.ts](../src/core/cli-runner.ts)
+- [src/python/app_changes.py](../src/python/app_changes.py)
 - [src/python/canvas_records.py](../src/python/canvas_records.py)
 - [src/python/common.py](../src/python/common.py)
 - [src/python/exam_plan.py](../src/python/exam_plan.py)
@@ -176,6 +188,9 @@ flowchart LR
 - [src/python/study_sets.py](../src/python/study_sets.py)
 - [src/python/syllabus.py](../src/python/syllabus.py)
 - [src/python/worker.py](../src/python/worker.py)
+- [src/server/app-changes.mjs](../src/server/app-changes.mjs)
+- [src/server/app-preview.mjs](../src/server/app-preview.mjs)
+- [src/server/app-recovery.mjs](../src/server/app-recovery.mjs)
 - [src/server/appearance-builder.mjs](../src/server/appearance-builder.mjs)
 - [src/server/builder.mjs](../src/server/builder.mjs)
 - [src/server/canvas-download.mjs](../src/server/canvas-download.mjs)
@@ -201,18 +216,19 @@ flowchart LR
 | Caller | Dependency | Source line |
 |---|---|---|
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/api.mjs | 1 |
-| [src/client/app.mjs](../src/client/app.mjs) | src/client/appearance-preview.mjs | 20 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/app-changes-ui.mjs | 19 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/appearance-preview.mjs | 21 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/builder-ui.mjs | 18 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/canvas-ui.mjs | 14 |
-| [src/client/app.mjs](../src/client/app.mjs) | src/client/chat-format.mjs | 21 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/chat-format.mjs | 22 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/connections-ui.mjs | 17 |
-| [src/client/app.mjs](../src/client/app.mjs) | src/client/customization-drawer.mjs | 19 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/customization-drawer.mjs | 20 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/customization.mjs | 15 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/documents.mjs | 3 |
-| [src/client/app.mjs](../src/client/app.mjs) | src/client/memory-ui.mjs | 22 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/memory-ui.mjs | 23 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/pdf-workspace.mjs | 2 |
-| [src/client/app.mjs](../src/client/app.mjs) | src/client/resources-ui.mjs | 24 |
-| [src/client/app.mjs](../src/client/app.mjs) | src/client/roger-navigation.mjs | 23 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/resources-ui.mjs | 25 |
+| [src/client/app.mjs](../src/client/app.mjs) | src/client/roger-navigation.mjs | 24 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/roger-widget.mjs | 16 |
 | [src/client/app.mjs](../src/client/app.mjs) | src/client/speech.mjs | 4 |
 | [src/client/canvas-ui.mjs](../src/client/canvas-ui.mjs) | src/client/canvas-display.mjs | 6 |
@@ -245,6 +261,8 @@ flowchart LR
 | [src/python/worker.py](../src/python/worker.py) | src/python/study_sets.py | 12 |
 | [src/python/worker.py](../src/python/worker.py) | src/python/study.py | 11 |
 | [src/python/worker.py](../src/python/worker.py) | src/python/syllabus.py | 14 |
+| [src/server/app-changes.mjs](../src/server/app-changes.mjs) | src/server/app-preview.mjs | 8 |
+| [src/server/app-changes.mjs](../src/server/app-changes.mjs) | src/server/security.mjs | 7 |
 | [src/server/appearance-builder.mjs](../src/server/appearance-builder.mjs) | src/server/security.mjs | 1 |
 | [src/server/builder.mjs](../src/server/builder.mjs) | src/server/security.mjs | 6 |
 | [src/server/canvas.mjs](../src/server/canvas.mjs) | src/server/canvas-download.mjs | 2 |
@@ -253,20 +271,22 @@ flowchart LR
 | [src/server/connections.mjs](../src/server/connections.mjs) | src/core/cli-runner.ts | 5 |
 | [src/server/course-export.mjs](../src/server/course-export.mjs) | src/server/security.mjs | 2 |
 | [src/server/document-processing.mjs](../src/server/document-processing.mjs) | src/server/python-presentation.mjs | 6 |
-| [src/server/http.mjs](../src/server/http.mjs) | src/server/appearance-builder.mjs | 23 |
+| [src/server/http.mjs](../src/server/http.mjs) | src/server/app-changes.mjs | 23 |
+| [src/server/http.mjs](../src/server/http.mjs) | src/server/app-recovery.mjs | 24 |
+| [src/server/http.mjs](../src/server/http.mjs) | src/server/appearance-builder.mjs | 25 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/builder.mjs | 22 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/canvas.mjs | 16 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/connections.mjs | 21 |
-| [src/server/http.mjs](../src/server/http.mjs) | src/server/course-export.mjs | 26 |
+| [src/server/http.mjs](../src/server/http.mjs) | src/server/course-export.mjs | 28 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/document-processing.mjs | 14 |
-| [src/server/http.mjs](../src/server/http.mjs) | src/server/memory.mjs | 25 |
+| [src/server/http.mjs](../src/server/http.mjs) | src/server/memory.mjs | 27 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/narration.mjs | 20 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/python-domain.mjs | 19 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/retrieval.mjs | 18 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/security.mjs | 5 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/study.mjs | 17 |
 | [src/server/http.mjs](../src/server/http.mjs) | src/server/submissions.mjs | 15 |
-| [src/server/http.mjs](../src/server/http.mjs) | src/server/web-resources.mjs | 24 |
+| [src/server/http.mjs](../src/server/http.mjs) | src/server/web-resources.mjs | 26 |
 | [src/server/index.mjs](../src/server/index.mjs) | src/server/http.mjs | 1 |
 | [src/server/index.mjs](../src/server/index.mjs) | src/server/memory.mjs | 2 |
 | [src/server/index.mjs](../src/server/index.mjs) | src/server/owner-canvas.mjs | 3 |

@@ -1,0 +1,225 @@
+.app-changes-heading {
+  max-width: 760px;
+  margin-bottom: 24px;
+}
+.app-changes-heading h1 {
+  margin-block: 8px 14px;
+}
+.app-change-steps {
+  display: flex;
+  flex-wrap: wrap;
+  counter-reset: step;
+  padding: 0;
+  gap: 10px;
+  list-style: none;
+  margin: 0 0 26px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.app-change-steps li {
+  counter-increment: step;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px 9px 9px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+}
+.app-change-steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--wash);
+}
+.app-change-steps[data-step='preview'] li:nth-child(2),
+.app-change-steps[data-step='applied'] li:last-child {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.app-change-form,
+.app-change-review,
+.app-change-loading {
+  padding: clamp(18px, 3vw, 30px);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 8px 30px #173f3208;
+}
+.app-change-form {
+  display: grid;
+  gap: 12px;
+}
+.app-change-form label {
+  font-weight: 700;
+}
+#app-change-request {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 108px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.6;
+}
+.app-change-actions,
+.app-change-recovery {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.app-change-status {
+  min-height: 1.5em;
+  margin-block: 18px;
+  font-size: 14px;
+}
+.app-change-review h2 {
+  font-size: clamp(23px, 3vw, 34px);
+  margin-block: 10px;
+}
+.app-change-review > p {
+  max-width: 760px;
+  line-height: 1.65;
+}
+.app-change-review > a {
+  margin-block: 8px;
+  text-decoration: none;
+}
+.app-change-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-left: 18px;
+}
+.app-change-files {
+  margin-block: 20px;
+  border-block: 1px solid var(--line);
+}
+.app-change-files details + details {
+  border-top: 1px solid var(--line);
+}
+.app-change-files summary {
+  padding-block: 14px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  font:
+    600 12px/1.6 ui-monospace,
+    monospace;
+}
+.app-change-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.app-change-comparison section {
+  min-width: 0;
+}
+.app-change-comparison h3 {
+  font-size: 12px;
+  margin-block: 0 8px;
+}
+.app-change-comparison pre {
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font:
+    11px/1.6 ui-monospace,
+    monospace;
+  tab-size: 2;
+}
+.app-change-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-block: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.app-change-confirmation input {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0;
+  accent-color: var(--accent);
+}
+.app-change-recovery {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.app-change-recovery > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.app-change-loading {
+  min-height: 270px;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+}
+.app-change-loading span {
+  font-weight: 700;
+}
+.app-change-loading div {
+  height: 18px;
+  width: 80%;
+  border-radius: 8px;
+  background: linear-gradient(110deg, var(--wash) 25%, var(--surface) 45%, var(--wash) 65%);
+  background-size: 220% 100%;
+  animation: app-change-shimmer 2s ease-in-out infinite;
+}
+.app-change-loading div + div {
+  width: 60%;
+}
+.app-change-loading p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.app-change-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.app-change-entry p {
+  margin: 0;
+  font-size: 13px;
+}
+@keyframes app-change-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-change-loading div {
+    animation: none;
+  }
+}
+@media (max-width: 700px) {
+  .app-change-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-change-entry {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

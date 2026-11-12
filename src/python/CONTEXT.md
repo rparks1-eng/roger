@@ -26,3 +26,10 @@ Human check: open/read a source, search the library, follow a returned passage,
 ask a consented question, and verify real course instructions. A failed worker
 must give a bounded error and leave the next request usable. Run the Python
 suite and Node process/HTTP/browser regressions before promotion.
+
+`app_changes.py` is a separate fixed CLI for local browser-source transactions, not
+a model-callable general file tool. Server-selected roots and an exact path
+allowlist are enforced with no-follow directory descriptors, owned regular files,
+byte limits, a private lock/journal, baseline hashes, atomic file replacements and
+interrupted-write rollback. It never executes generated code. One prior change is
+retained; newer source edits block Undo. POSIX only (macOS/Linux).

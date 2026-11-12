@@ -46,3 +46,16 @@ no generated code runs in Node or the parent app. Session expiry and server clos
 dispose connection services. See Engineering Checks.md for current evidence.
 
 `memory.mjs` owns private local conversation persistence, explicit preferences, exact course/assignment retrieval, paginated inspection, pause/export/deletion and capacity failure. Runtime injects disk storage; fixture servers default to in-memory storage. `appearance-builder.mjs` validates a declarative appearance; `web-resources.mjs` uses fixed public book metadata endpoints; `course-export.mjs` creates explicitly partial course snapshots. No generated code receives these capabilities directly.
+
+`app-changes.mjs` builds exact source edits through the selected connection, formats
+and checks candidate browser code without executing it, and captures fixed public
+assets for `app-preview.mjs`. Preview uses localhost; the live entry redirects to
+127.0.0.1, separating cookies and storage. Preview APIs contain sample data only
+and reject all mutations. Its CSP restricts subresources; top-level navigation is
+not claimed to be fully confined. No personal data or credentials enter preview.
+The authenticated Apply route requires an opened, owner-bound draft and explicit
+confirmation. Fixed Python `app_changes.py` owns allowlisted source transactions,
+exact-hash conflicts and a private crash-recovery journal. No generated server code
+executes. `app-recovery.mjs` serves immutable recovery controls outside editable
+source. Changes become actual browser code only after Apply, not automatically
+published or deployed. Secure file transactions currently require macOS/Linux.

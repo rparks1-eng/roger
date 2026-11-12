@@ -27,6 +27,7 @@ const prettier = [
   'public/builder.css',
   'public/connections.css',
   'public/appearance.css',
+  'public/app-changes.css',
   'public/resources.css',
   'public/memory.css',
   'tests',

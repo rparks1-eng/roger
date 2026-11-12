@@ -16,6 +16,7 @@ import { createCustomization } from '/client/customization.mjs';
 import { mountRogerWidget } from '/client/roger-widget.mjs';
 import { createConnectionsUI } from '/client/connections-ui.mjs';
 import { createBuilderUI, isBuildRequest } from '/client/builder-ui.mjs';
+import { createAppChangesUI, isAppChangeRequest } from '/client/app-changes-ui.mjs';
 import { createCustomizationDrawer } from '/client/customization-drawer.mjs';
 import { createAppearancePreview, isAppearanceRequest } from '/client/appearance-preview.mjs';
 import { renderChatText } from '/client/chat-format.mjs';
@@ -71,6 +72,11 @@ const customizations = createCustomization({
   getVoicePreset: () => getSpeechPreferences().presetId,
   onNavigate: () => view('customize'),
   onBuild: (message) => {
+    if (isAppChangeRequest(message)) {
+      customizationDrawer.close();
+      void appChangesUI.request(message);
+      return;
+    }
     if (isAppearanceRequest(message)) {
       void appearanceUI.request(message);
       return;
@@ -99,6 +105,13 @@ const builderUI = createBuilderUI({
   getSelection: () => connectionsUI.getSelection(),
   onConnect: () => view('connections'),
   onNavigate: () => view('builder'),
+});
+const appChangesUI = createAppChangesUI({
+  container: $('app-changes-content'),
+  api,
+  getSelection: () => connectionsUI.getSelection(),
+  onConnect: () => view('connections'),
+  onNavigate: () => view('app-changes'),
 });
 const appearanceUI = createAppearancePreview({
   container: $('appearance-content'),
@@ -165,6 +178,7 @@ function view(name, { automatic = false } = {}) {
   stop();
   resetQuestionContext();
   if (name !== 'builder') builderUI.leave();
+  if (name !== 'app-changes') appChangesUI.leave();
   if (name !== 'reader') {
     closePDF();
     ocrController?.abort();
@@ -174,6 +188,7 @@ function view(name, { automatic = false } = {}) {
     'courses',
     'reader',
     'builder',
+    'app-changes',
     'connections',
     'resources',
     'memory',
@@ -188,6 +203,7 @@ function view(name, { automatic = false } = {}) {
   if (name === 'resources') resourcesUI.render();
   if (name === 'memory') return memoryUI.render();
   if (name === 'builder') void builderUI.render();
+  if (name === 'app-changes') void appChangesUI.render();
   if (name === 'connections') void connectionsUI.render().catch((error) => status(error.message));
 }
 function renderLibrary() {
@@ -670,7 +686,7 @@ async function start() {
         source.append(option);
       }
       if ([...source.options].some((option) => option.value === previous)) source.value = previous;
-      source.hidden = !state.documents.length || $('roger-mode').value === 'build';
+      source.hidden = !state.documents.length || $('roger-mode').value !== 'ask';
       if (!alreadyOpen) rogerResponse.replaceChildren();
     },
     onClose: () => {
@@ -683,8 +699,12 @@ async function start() {
   });
   $('roger-mode').addEventListener('change', () => {
     $('roger-message').placeholder =
-      $('roger-mode').value === 'build' ? 'What should Roger build or change?' : 'Ask Roger…';
-    $('roger-source').hidden = !state.documents.length || $('roger-mode').value === 'build';
+      $('roger-mode').value === 'change-app'
+        ? 'What should Roger change about the app?'
+        : $('roger-mode').value === 'build'
+          ? 'What standalone tool should Roger build?'
+          : 'Ask Roger…';
+    $('roger-source').hidden = !state.documents.length || $('roger-mode').value !== 'ask';
   });
   $('roger-source').addEventListener('change', () => {
     cancelQuestion();
@@ -747,6 +767,22 @@ async function start() {
       } catch (error) {
         rogerResponse.textContent = error.message;
       }
+      return;
+    }
+    if (
+      $('roger-mode').value === 'change-app' ||
+      ($('roger-mode').value !== 'build' && isAppChangeRequest(message))
+    ) {
+      companion.close({ focus: false });
+      const previewed = await appChangesUI.request(message);
+      const changeState = appChangesUI.getState();
+      await rememberExchange(
+        message,
+        previewed && changeState.draft
+          ? `Created a whole-app preview: ${changeState.draft.title}. No app files have been applied. Open the preview and review the change before applying it.`
+          : 'Opened app changes for this request. No successful new preview was recorded.',
+        {},
+      );
       return;
     }
     if (isAppearanceRequest(message)) {
